@@ -4,20 +4,19 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 4 trạng thái khớp trực tiếp với Thanh tiến trình (Stepper) trên giao diện:
- * 1. BOOKED_ORIGINAL : Khách đặt theo nguyên bản Tour Preset (đã có sẵn giá gốc, có thể chốt luôn hoặc bấm sửa)
- * 2. WAITING_REQUOTE : Khách đã chỉnh sửa lịch trình theo ý muốn -> Đang chờ Tour Guide báo giá lại
- * 3. REQUOTED        : Tour Guide đã cập nhật giá từng mục & gửi Báo giá lại -> Chờ Khách đồng ý chốt
- * 4. CONFIRMED       : Khách đã đồng ý chốt Tour
- * 5. CANCELLED       : Đã huỷ
+ * 4 bước thân thiện trên Thanh tiến trình (Stepper):
+ * Bước 1: Khách gửi yêu cầu đặt tour (BOOKED_ORIGINAL)
+ * Bước 2: Tuỳ chỉnh lịch trình - Chờ Guide báo giá (WAITING_REQUOTE)
+ * Bước 3: Guide kiểm tra & Báo giá chốt (REQUOTED)
+ * Bước 4: Khách đồng ý & Hoàn tất (CONFIRMED)
  */
 @Getter
 @RequiredArgsConstructor
 public enum BookingStatus {
-    BOOKED_ORIGINAL("Đã đặt theo giá gốc", 1),
-    WAITING_REQUOTE("Chờ Guide báo giá lại", 2),
-    REQUOTED("Guide đã báo giá lại", 3),
-    CONFIRMED("Khách đã đồng ý chốt", 4),
+    BOOKED_ORIGINAL("Đặt theo lịch trình chuẩn", 1),
+    WAITING_REQUOTE("Đã tuỳ chỉnh · Chờ Guide báo giá", 2),
+    REQUOTED("Guide đã báo giá chốt", 3),
+    CONFIRMED("Khách đã đồng ý & Hoàn tất", 4),
     CANCELLED("Đã huỷ", 0);
 
     private final String label;

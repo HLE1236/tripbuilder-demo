@@ -91,7 +91,9 @@ export interface BookingStep {
   category: string;
   title: string;
   pricePerPerson: number;
-  /** "PRESET" | "MODIFIED" | "CUSTOM" | "GUIDE" */
+  originalTitle?: string | null;
+  originalPricePerPerson?: number | null;
+  /** "PRESET" | "MODIFIED" | "REMOVED" | "CUSTOM" | "GUIDE" */
   noteType: string;
 }
 
@@ -129,13 +131,13 @@ export function formatVnd(amount: number | null | undefined): string {
 export function statusBadge(status: BookingStatus): { bg: string; text: string } {
   switch (status) {
     case 'BOOKED_ORIGINAL':
-      return { bg: 'bg-blue-100 text-blue-800 border-blue-300', text: '1. Đã đặt (Giá gốc)' };
+      return { bg: 'bg-blue-100 text-blue-800 border-blue-300', text: '1. Khách gửi yêu cầu đặt tour (Giá chuẩn)' };
     case 'WAITING_REQUOTE':
-      return { bg: 'bg-amber-100 text-amber-900 border-amber-400', text: '2. Khách đã sửa · Chờ báo giá lại' };
+      return { bg: 'bg-amber-100 text-amber-900 border-amber-400', text: '2. Đã tuỳ chỉnh · Chờ Guide báo giá chốt' };
     case 'REQUOTED':
-      return { bg: 'bg-purple-100 text-purple-900 border-purple-400', text: '3. Đã báo giá lại · Chờ khách chốt' };
+      return { bg: 'bg-purple-100 text-purple-900 border-purple-400', text: '3. Guide đã báo giá chốt · Chờ khách đồng ý' };
     case 'CONFIRMED':
-      return { bg: 'bg-emerald-100 text-emerald-800 border-emerald-400', text: '4. Đã đồng ý chốt Tour' };
+      return { bg: 'bg-emerald-100 text-emerald-800 border-emerald-400', text: '4. Khách đã đồng ý & Hoàn tất' };
     case 'CANCELLED':
       return { bg: 'bg-gray-200 text-gray-600 border-gray-300', text: 'Đã huỷ' };
   }
@@ -144,13 +146,15 @@ export function statusBadge(status: BookingStatus): { bg: string; text: string }
 export function noteTypeBadge(noteType: string): { label: string; cls: string } {
   switch (noteType) {
     case 'MODIFIED':
-      return { label: 'Khách đã sửa/đổi', cls: 'bg-amber-100 text-amber-800 border-amber-300' };
+      return { label: '🔄 Đã đổi lựa chọn', cls: 'bg-amber-100 text-amber-800 border-amber-300' };
+    case 'REMOVED':
+      return { label: '✕ Đã bỏ mục này', cls: 'bg-rose-100 text-rose-700 border-rose-300' };
     case 'CUSTOM':
-      return { label: 'Khách yêu cầu thêm', cls: 'bg-purple-100 text-purple-800 border-purple-300' };
+      return { label: '✨ Yêu cầu thêm', cls: 'bg-purple-100 text-purple-800 border-purple-300' };
     case 'GUIDE':
-      return { label: 'Guide đã báo giá', cls: 'bg-blue-100 text-blue-800 border-blue-300' };
+      return { label: '🧭 Guide đã báo giá', cls: 'bg-blue-100 text-blue-800 border-blue-300' };
     default:
-      return { label: 'Giữ nguyên gốc', cls: 'bg-gray-100 text-gray-600 border-gray-300' };
+      return { label: '✓ Theo lịch trình chuẩn', cls: 'bg-gray-100 text-gray-600 border-gray-300' };
   }
 }
 

@@ -27,11 +27,37 @@ public class BookingService {
 
     // ===================== DTOs =====================
 
-    public record StepInput(int dayNumber, String category, String title, long pricePerPerson, String noteType) {}
+    public record StepInput(
+            int dayNumber,
+            String category,
+            String title,
+            long pricePerPerson,
+            String originalTitle,
+            Long originalPricePerPerson,
+            String noteType
+    ) {}
 
-    public record BookingStepDto(Long id, int dayNumber, String category, String title, long pricePerPerson, String noteType) {
+    public record BookingStepDto(
+            Long id,
+            int dayNumber,
+            String category,
+            String title,
+            long pricePerPerson,
+            String originalTitle,
+            Long originalPricePerPerson,
+            String noteType
+    ) {
         public static BookingStepDto from(BookingStep s) {
-            return new BookingStepDto(s.getId(), s.getDayNumber(), s.getCategory(), s.getTitle(), s.getPricePerPerson(), s.getNoteType());
+            return new BookingStepDto(
+                    s.getId(),
+                    s.getDayNumber(),
+                    s.getCategory(),
+                    s.getTitle(),
+                    s.getPricePerPerson(),
+                    s.getOriginalTitle(),
+                    s.getOriginalPricePerPerson(),
+                    s.getNoteType()
+            );
         }
     }
 
@@ -59,7 +85,6 @@ public class BookingService {
             List<BookingStepDto> steps
     ) {}
 
-    /** Request khi Khách bấm Book (có thể đã chỉnh sửa ngay lúc book hoặc giữ nguyên). */
     public record CreateBookingRequest(
             Long tourId,
             Long customerId,
@@ -71,7 +96,6 @@ public class BookingService {
             List<StepInput> steps
     ) {}
 
-    /** Request khi Khách bấm "Chỉnh sửa theo ý muốn" trên đơn đã tạo. */
     public record CustomizeRequest(
             LocalDate startDate,
             int days,
@@ -80,7 +104,6 @@ public class BookingService {
             List<StepInput> steps
     ) {}
 
-    /** Request khi Tour Guide bấm "Gửi Báo giá lại" (được sửa từng dòng + giá + phụ thu/giảm giá + lời nhắn). */
     public record RequoteRequest(
             int days,
             int guests,
@@ -109,7 +132,11 @@ public class BookingService {
         return toDto(find(id));
     }
 
-    /** Bước 1 & 2: Khách đặt tour (nếu customized = true -> chuyển thẳng sang Chờ Guide báo giá lại). */
+    /**
+     * Khách đặt tour.
+     * Lưu ý theo Đề xuất 4: Nếu khách giữ nguyên 100% lịch trình và chỉ viết lời nhắn dặn dò (customerNote),
+     * đơn vẫn được giữ nguyên Giá gốc (BOOKED_ORIGINAL) chứ không bị ép thành đơn thay đổi lịch trình.
+     */
     @Transactional
     public BookingDto create(CreateBookingRequest req) {
         Tour tour = tourService.find(req.tourId() == null ? -1 : req.tourId());
@@ -134,19 +161,18 @@ public class BookingService {
                 .currentPricePerPerson(tour.getBasePricePerPerson())
                 .groupAdjustment(0L)
                 .totalPrice(tour.getBasePricePerPerson() * guests)
-                .status(req.customized() ? BookingStatus.WAITING_REQUOTE : BookingStatus.BOOKED_ORIGINAL)
+                .status(BookingStatus.BOOKED_ORIGINAL)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
         if (req.steps() != null && !req.steps().isEmpty()) {
             applySteps(b, req.steps(), days, guests, 0L);
-            // Nếu có bất kỳ dòng nào khác PRESET hoặc đổi số ngày hoặc có ghi chú yêu cầu -> cần báo giá lại
-            boolean hasDiff = req.customized()
-                    || days != tour.getDays()
+            // Chỉ chuyển sang WAITING_REQUOTE khi thực sự có thay đổi lịch trình hoặc đổi số ngày
+            boolean scheduleChanged = days != tour.getDays()
                     || b.getSteps().size() != tour.getSteps().size()
                     || b.getSteps().stream().anyMatch(s -> !"PRESET".equals(s.getNoteType()));
-            b.setStatus(hasDiff ? BookingStatus.WAITING_REQUOTE : BookingStatus.BOOKED_ORIGINAL);
+            b.setStatus(scheduleChanged ? BookingStatus.WAITING_REQUOTE : BookingStatus.BOOKED_ORIGINAL);
         } else {
             int order = 1;
             for (TourStep ts : tour.getSteps()) {
@@ -156,6 +182,8 @@ public class BookingService {
                         .category(ts.getCategory())
                         .title(ts.getTitle())
                         .pricePerPerson(ts.getPricePerPerson())
+                        .originalTitle(ts.getTitle())
+                        .originalPricePerPerson(ts.getPricePerPerson())
                         .noteType("PRESET")
                         .sortOrder(order++)
                         .build());
@@ -167,7 +195,7 @@ public class BookingService {
         return toDto(b);
     }
 
-    /** Khách bấm "Chỉnh sửa theo ý muốn" trên đơn đã tạo -> chuyển sang WAITING_REQUOTE. */
+    /** Khách bấm "Tuỳ chỉnh lịch trình" trên đơn đã tạo. */
     @Transactional
     public BookingDto customize(Long id, CustomizeRequest req) {
         Booking b = find(id);
@@ -180,13 +208,16 @@ public class BookingService {
         b.setCustomerNote(trim(req.customerNote()));
 
         applySteps(b, req.steps(), days, guests, 0L);
-        b.setStatus(BookingStatus.WAITING_REQUOTE);
+        boolean scheduleChanged = days != b.getTour().getDays()
+                || b.getSteps().size() != b.getTour().getSteps().size()
+                || b.getSteps().stream().anyMatch(s -> !"PRESET".equals(s.getNoteType()));
+        b.setStatus(scheduleChanged ? BookingStatus.WAITING_REQUOTE : BookingStatus.BOOKED_ORIGINAL);
         b.setUpdatedAt(LocalDateTime.now());
         bookingRepository.flush();
         return toDto(b);
     }
 
-    /** Bước 3: Tour Guide sửa từng dòng giá / hoạt động và gửi Báo giá lại -> chuyển sang REQUOTED. */
+    /** Tour Guide kiểm tra & gửi Báo giá chốt. */
     @Transactional
     public BookingDto requote(Long id, RequoteRequest req) {
         Booking b = find(id);
@@ -204,7 +235,7 @@ public class BookingService {
         return toDto(b);
     }
 
-    /** Bước 4: Khách đồng ý chốt Tour -> CONFIRMED. */
+    /** Khách đồng ý & Hoàn tất. */
     @Transactional
     public BookingDto confirm(Long id) {
         Booking b = find(id);
@@ -239,16 +270,23 @@ public class BookingService {
         int order = 1;
         for (StepInput s : inputs) {
             if (s.title() == null || s.title().isBlank()) continue;
-            int day = Math.max(1, Math.min(days, s.dayNumber()));
-            long price = Math.max(0, s.pricePerPerson());
+            // Đề xuất 4: Chỉ giữ và tính tiền các hoạt động nằm trong số ngày đi (days)
+            if (s.dayNumber() < 1 || s.dayNumber() > days) continue;
+
+            String noteType = s.noteType() == null || s.noteType().isBlank() ? "PRESET" : s.noteType();
+            boolean isRemoved = "REMOVED".equals(noteType);
+            long price = isRemoved ? 0L : Math.max(0, s.pricePerPerson());
             sumPerPerson += price;
+
             b.getSteps().add(BookingStep.builder()
                     .booking(b)
-                    .dayNumber(day)
+                    .dayNumber(s.dayNumber())
                     .category(s.category() == null || s.category().isBlank() ? "Hoạt động" : s.category())
                     .title(s.title().trim())
                     .pricePerPerson(price)
-                    .noteType(s.noteType() == null || s.noteType().isBlank() ? "PRESET" : s.noteType())
+                    .originalTitle(s.originalTitle())
+                    .originalPricePerPerson(s.originalPricePerPerson())
+                    .noteType(noteType)
                     .sortOrder(order++)
                     .build());
         }
