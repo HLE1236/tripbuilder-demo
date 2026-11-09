@@ -1,0 +1,21 @@
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Java / Backend
+backend/target/
+backend/data/
+backend/application-local.properties
+backend/application-*.properties
+!backend/src/main/resources/application.properties
+!backend/src/main/resources/application-h2.properties
+!backend/application-local.example.properties
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
