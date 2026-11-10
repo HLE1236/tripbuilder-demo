@@ -1,27 +1,36 @@
 import type { BookingStatus } from '../api';
+import Icon from './Icon';
 
-const STEPS = [
-  {
-    idx: 1,
-    title: '1. Khách gửi yêu cầu đặt tour',
-    sub: 'Chọn ngày đi, số khách & lịch trình',
-  },
-  {
-    idx: 2,
-    title: '2. Tuỳ chỉnh lịch trình (Nếu có)',
-    sub: 'Đổi khách sạn, thêm/bớt hoạt động',
-  },
-  {
-    idx: 3,
-    title: '3. Guide kiểm tra & Báo giá chốt',
-    sub: 'Cập nhật giá mục mới & ưu đãi đoàn',
-  },
-  {
-    idx: 4,
-    title: '4. Khách đồng ý & Hoàn tất',
-    sub: 'Xác nhận tổng chi phí cuối cùng',
-  },
+const LEGS = [
+  { idx: 1, title: 'Khách gửi yêu cầu', sub: 'Chọn ngày, số khách, lịch trình' },
+  { idx: 2, title: 'Tuỳ chỉnh lịch trình', sub: 'Đổi, bỏ, thêm mục (nếu có)' },
+  { idx: 3, title: 'Guide báo giá chốt', sub: 'Điền giá mục mới, ưu đãi đoàn' },
+  { idx: 4, title: 'Khách đồng ý', sub: 'Xác nhận tổng chi phí' },
 ];
+
+const NEXT_ACTION: Record<BookingStatus, { who: string; text: string; tone: string }> = {
+  BOOKED_ORIGINAL: {
+    who: 'Khách hàng',
+    text: 'Đơn đang giữ nguyên lịch trình chuẩn. Bấm “Đồng ý & hoàn tất” để chốt, hoặc “Tuỳ chỉnh lịch trình” nếu muốn đổi dịch vụ.',
+    tone: 'text-navy dark:text-navy-ink',
+  },
+  WAITING_REQUOTE: {
+    who: 'Tour Guide',
+    text: 'Khách đã tuỳ chỉnh lịch trình. Guide kiểm tra các mục đổi/thêm, điền giá rồi gửi báo giá chốt.',
+    tone: 'text-amber',
+  },
+  REQUOTED: {
+    who: 'Khách hàng',
+    text: 'Guide đã gửi báo giá chốt. Khách xem bảng so sánh trước/sau bên dưới rồi bấm “Đồng ý & hoàn tất”.',
+    tone: 'text-carbon',
+  },
+  CONFIRMED: {
+    who: 'Hoàn tất',
+    text: 'Khách đã đồng ý với báo giá. Chuyến đi đã sẵn sàng khởi hành.',
+    tone: 'text-green',
+  },
+  CANCELLED: { who: '', text: '', tone: '' },
+};
 
 export default function Stepper({
   status,
@@ -32,85 +41,66 @@ export default function Stepper({
 }) {
   if (status === 'CANCELLED') {
     return (
-      <div className="bg-gray-100 border border-gray-300 text-gray-600 px-4 py-3 rounded-xl text-sm font-semibold text-center">
-        ✕ Đơn đặt tour này đã được huỷ.
+      <div className="rounded-lg border border-hairline bg-stock px-5 py-4 flex items-center gap-3 shadow-coupon">
+        <span className="stamp text-red anim-stamp">Void · Đã huỷ</span>
+        <p className="text-sm text-ink-2">Đơn đặt tour này đã được huỷ. Các coupon bên dưới chỉ còn giá trị tham khảo.</p>
       </div>
     );
   }
 
-  let nextActionHint = '';
-  let hintStyle = 'bg-blue-50 border-blue-200 text-blue-900';
-
-  if (status === 'BOOKED_ORIGINAL') {
-    nextActionHint =
-      '💡 Đang ở Bước 1: Khách giữ nguyên lịch trình chuẩn. Khách có thể bấm "Đồng ý chốt Tour" ngay hoặc bấm "Tuỳ chỉnh lịch trình" nếu muốn đổi dịch vụ.';
-    hintStyle = 'bg-blue-50 border-blue-200 text-blue-900';
-  } else if (status === 'WAITING_REQUOTE') {
-    nextActionHint =
-      '⏳ Đang ở Bước 2 → Chờ Bước 3: Khách đã tuỳ chỉnh lịch trình theo ý muốn. Việc tiếp theo: Tour Guide kiểm tra các mục khách đổi/thêm và gửi Báo giá chốt.';
-    hintStyle = 'bg-amber-50 border-amber-300 text-amber-900';
-  } else if (status === 'REQUOTED') {
-    nextActionHint =
-      '📨 Đang ở Bước 3 → Chờ Bước 4: Tour Guide đã gửi Báo giá chốt kèm phản hồi. Việc tiếp theo: Khách hàng xem bảng so sánh giá bên dưới và bấm "Đồng ý & Hoàn tất".';
-    hintStyle = 'bg-purple-50 border-purple-300 text-purple-900';
-  } else if (status === 'CONFIRMED') {
-    nextActionHint =
-      '🎉 Hoàn tất cả 4 bước! Khách hàng đã đồng ý với Báo giá chốt của Tour Guide. Chuyến đi đã sẵn sàng khởi hành.';
-    hintStyle = 'bg-emerald-50 border-emerald-300 text-emerald-900';
-  }
+  const next = NEXT_ACTION[status];
+  const isConfirmed = status === 'CONFIRMED';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        {STEPS.map((s) => {
-          const isDone = stepIndex > s.idx || status === 'CONFIRMED';
-          const isCurrent = stepIndex === s.idx && status !== 'CONFIRMED';
+    <section aria-label="Tiến trình đơn đặt tour" className="rounded-lg border border-hairline bg-stock shadow-coupon overflow-hidden">
+      <ol className="grid grid-cols-2 lg:grid-cols-4">
+        {LEGS.map((leg, i) => {
+          const done = isConfirmed || stepIndex > leg.idx;
+          const current = !isConfirmed && stepIndex === leg.idx;
           return (
-            <div
-              key={s.idx}
-              className={`p-3 rounded-lg border flex items-center gap-3 transition-all ${
-                isCurrent
-                  ? 'border-blue-500 bg-blue-50/90 ring-2 ring-blue-500/20'
-                  : isDone
-                  ? 'border-emerald-200 bg-emerald-50/60'
-                  : 'border-gray-200 bg-gray-50 opacity-60'
+            <li
+              key={leg.idx}
+              aria-current={current ? 'step' : undefined}
+              className={`relative px-4 py-3.5 flex items-start gap-3 ${
+                i % 2 === 1 ? 'perf-y' : i === 2 ? 'lg:perf-y' : ''
+              } ${i >= 2 ? 'border-t border-hairline lg:border-t-0' : ''} ${
+                current ? 'bg-carbon-soft' : ''
               }`}
             >
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                  isCurrent
-                    ? 'bg-blue-600 text-white'
-                    : isDone
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-300 text-gray-700'
+              <span
+                className={`num mt-0.5 grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
+                  done
+                    ? 'bg-green text-stock'
+                    : current
+                    ? 'bg-carbon text-stock'
+                    : 'border border-hairline-strong text-ink-3'
                 }`}
               >
-                {isDone ? '✓' : s.idx}
-              </div>
+                {done ? <Icon name="check" size={14} strokeWidth={2.5} /> : leg.idx}
+              </span>
               <div className="min-w-0">
-                <p
-                  className={`text-xs font-bold truncate ${
-                    isCurrent
-                      ? 'text-blue-900'
-                      : isDone
-                      ? 'text-emerald-900'
-                      : 'text-gray-600'
-                  }`}
-                >
-                  {s.title}
+                <p className="coupon-head text-[0.7rem] text-ink-3">Chặng {leg.idx}</p>
+                <p className={`text-sm font-semibold leading-snug ${done || current ? 'text-ink' : 'text-ink-3'}`}>
+                  {leg.title}
                 </p>
-                <p className="text-[11px] text-gray-500 truncate">{s.sub}</p>
+                <p className="text-xs text-ink-3 mt-0.5 hidden sm:block">{leg.sub}</p>
               </div>
-            </div>
+              {done && (
+                <span key={`${status}-${leg.idx}`} className="stamp text-green absolute right-3 top-3 hidden xl:inline-flex anim-stamp">
+                  Đã qua
+                </span>
+              )}
+            </li>
           );
         })}
-      </div>
+      </ol>
 
-      {nextActionHint && (
-        <div className={`px-3.5 py-2.5 rounded-lg border text-xs font-medium ${hintStyle}`}>
-          {nextActionHint}
-        </div>
-      )}
-    </div>
+      <div key={status} className="perf-x mx-0 px-5 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 anim-tear">
+        <span className={`coupon-head text-sm ${next.tone}`}>
+          {isConfirmed ? 'Hoàn tất' : `Việc tiếp theo · ${next.who}`}
+        </span>
+        <p className="text-sm text-ink-2">{next.text}</p>
+      </div>
+    </section>
   );
 }

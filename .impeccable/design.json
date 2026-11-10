@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T09:04:00+07:00",
+  "title": "Design System: TripBuilder",
+  "extensions": {
+    "colorMeta": {
+      "navy": {
+        "role": "primary",
+        "displayName": "Carrier Navy",
+        "canonical": "#0f2a4a",
+        "tonalRamp": ["#061222", "#0a1c34", "#0f2a4a", "#173a63", "#2b5485", "#517aa8", "#8aa9cc", "#d3e0ef"]
+      },
+      "carbon": {
+        "role": "secondary",
+        "displayName": "Carbon Figure Purple",
+        "canonical": "#4b2e83",
+        "tonalRamp": ["#1d1036", "#321e5c", "#4b2e83", "#6543a6", "#8364c2", "#a58cdb", "#cbbcf0", "#f1ecfa"]
+      },
+      "red": {
+        "role": "tertiary",
+        "displayName": "Carrier Red (Void)",
+        "canonical": "#c8102e",
+        "tonalRamp": ["#3a0610", "#6b0a1b", "#990d24", "#c8102e", "#e03550", "#ef6c81", "#f7aab7", "#fdecef"]
+      },
+      "green": {
+        "role": "tertiary",
+        "displayName": "Validated Green",
+        "canonical": "#17734a",
+        "tonalRamp": ["#072919", "#0e4b30", "#17734a", "#229663", "#42b583", "#74cea6", "#b0e5cd", "#e6f4ec"]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Pending Amber",
+        "canonical": "#a15c00",
+        "tonalRamp": ["#331c00", "#5c3400", "#804900", "#a15c00", "#c47612", "#df9940", "#f2c385", "#fdf3e2"]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cool Paper Ground",
+        "canonical": "#eef1f5",
+        "tonalRamp": ["#08111e", "#121a26", "#22324a", "#475467", "#6b778a", "#b9c2cf", "#d6dce5", "#eef1f5"]
+      },
+      "stock": {
+        "role": "neutral",
+        "displayName": "Coupon Stock",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#111d2e", "#1b2b42", "#31445f", "#5b6d85", "#8a99ad", "#c5cedb", "#f6f8fb", "#ffffff"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Condensed", "purpose": "Main view titles and ticket headers." },
+      "headline": { "displayName": "Headline Condensed", "purpose": "Tour and booking titles." },
+      "title": { "displayName": "Section Title", "purpose": "Tour card titles and coupon subheadings." },
+      "body": { "displayName": "Body Vietnamese Sans", "purpose": "Itinerary copy, notes, and form controls." },
+      "label": { "displayName": "Coupon Head / Stamp", "purpose": "Uppercase ruled-box headers and rubber stamps." },
+      "mono": { "displayName": "Tabular Carbon Numerals", "purpose": "All VND prices, booking codes, dates, and counts." }
+    },
+    "shadows": [
+      {
+        "name": "shadow-coupon",
+        "value": "0 1px 2px rgb(15 42 74 / 0.06), 0 6px 18px -8px rgb(15 42 74 / 0.18)",
+        "purpose": "Default resting elevation for tour and booking coupons."
+      },
+      {
+        "name": "shadow-lift",
+        "value": "0 2px 4px rgb(15 42 74 / 0.08), 0 16px 32px -12px rgb(15 42 74 / 0.28)",
+        "purpose": "Hovered tour coupons and modal dialog elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "tear-in",
+        "value": "520ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Perforated next-action strip reveal when a booking advances to a new leg."
+      },
+      {
+        "name": "stamp-in",
+        "value": "380ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Rubber-stamp status badge impact animation."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action CTA on coupons and forms.",
+      "html": "<button class=\"ds-btn-primary\">Xem lịch trình & đặt</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 0.45rem; background: var(--navy, #0f2a4a); color: var(--navy-ink, #e9eff7); border: 1px solid transparent; border-radius: 6px; padding: 0.55rem 1rem; font-family: 'Be Vietnam Pro', sans-serif; font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: background-color 150ms ease, transform 150ms ease; } .ds-btn-primary:hover { background: var(--navy-2, #173a63); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--carbon, #4b2e83); outline-offset: 2px; }"
+    },
+    {
+      "name": "Confirm Button",
+      "kind": "button",
+      "refersTo": "button-confirm",
+      "description": "Final booking confirmation and item restore CTA.",
+      "html": "<button class=\"ds-btn-confirm\">Đồng ý & hoàn tất (4.500.000đ)</button>",
+      "css": ".ds-btn-confirm { display: inline-flex; align-items: center; gap: 0.45rem; background: var(--green, #17734a); color: #ffffff; border: 1px solid transparent; border-radius: 6px; padding: 0.75rem 1.35rem; font-family: 'Be Vietnam Pro', sans-serif; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: filter 150ms ease, transform 150ms ease; } .ds-btn-confirm:hover { filter: brightness(1.08); } .ds-btn-confirm:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Rubber Stamp Badge",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "Rotated uppercase stamp marking coupon status or line-item modification.",
+      "html": "<span class=\"ds-stamp\">VOID · ĐÃ BỎ</span>",
+      "css": ".ds-stamp { display: inline-flex; align-items: center; gap: 0.3rem; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; line-height: 1; padding: 0.28rem 0.5rem; color: var(--red, #c8102e); background: var(--red-soft, #fdecef); border: 1.5px solid currentColor; border-radius: 3px; transform: rotate(-2deg); }"
+    },
+    {
+      "name": "Filter / Quick-Pick Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "1-tap pill for destination filtering, quick custom requests, and price presets.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\">Vịnh Hạ Long</button>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid var(--hairline-strong, #b9c2cf); background: var(--stock, #ffffff); color: var(--ink-2, #475467); border-radius: 9999px; padding: 0.35rem 0.8rem; font-family: 'Be Vietnam Pro', sans-serif; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: background-color 150ms ease, color 150ms ease; } .ds-chip[aria-pressed='true'] { background: var(--navy, #0f2a4a); border-color: var(--navy, #0f2a4a); color: var(--navy-ink, #e9eff7); }"
+    },
+    {
+      "name": "Wallet Field Input",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Text and numeric input styled for coupon forms.",
+      "html": "<input class=\"ds-field\" value=\"350.000\" />",
+      "css": ".ds-field { background: var(--stock, #ffffff); border: 1px solid var(--hairline-strong, #b9c2cf); border-radius: 6px; padding: 0.5rem 0.75rem; color: var(--ink, #121a26); font-family: 'Roboto Mono', monospace; font-size: 0.9rem; font-weight: 700; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-field:focus { outline: none; border-color: var(--carbon, #4b2e83); box-shadow: 0 0 0 3px var(--carbon-soft, #f1ecfa); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Jet-Age Ticket Wallet (Ví vé hành trình)",
+    "overview": "TripBuilder treats every tour and booking as a tactile paper ticket wallet rather than a generic SaaS form. Each itinerary day is a coupon sheet with a stub header, 1px hairline-ruled fare boxes, and perforated tear lines. Nothing vanishes silently when a traveller customizes a schedule: swapped items, removed activities, and guide price updates are stamped directly onto the coupon so both the traveller and the local guide always see the full before-and-after story.",
+    "keyCharacteristics": [
+      "Carrier Navy (#0f2a4a) shell paired with crisp white coupon stock (#ffffff) over a cool paper ground (#eef1f5).",
+      "Carbon-copy purple (#4b2e83) reserved for filled figures: prices, booking codes, and calculated totals.",
+      "Perforated dividers (.perf-x, .perf-y) with semicircle edge notches separating coupon bodies from fare stubs.",
+      "Rubber-stamp state badges (.stamp) rotated -2deg in condensed uppercase type.",
+      "Full light and dark mode parity controlled via CSS custom properties on :root and .dark."
+    ],
+    "rules": [
+      {
+        "name": "The Carbon Figure Rule",
+        "body": "Every price, booking code, and numeric delta is rendered in tabular monospace and tinted with Carbon Figure Purple (--carbon) when it represents an active fare or total.",
+        "section": "colors"
+      },
+      {
+        "name": "The Void-Never-Vanishes Rule",
+        "body": "Removing a preset activity never deletes the row; it marks the row REMOVED (0đ) with a red VOID · ĐÃ BỎ stamp and a 1-click restore button so both parties see what was deducted.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Money Rule",
+        "body": "Every Vietnamese Dong amount, guest count, day count, and date string must carry .num (Roboto Mono, tabular-nums) so columns of figures never jitter when quantities change.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Nested-Cards Rule",
+        "body": "A coupon sheet is the only card container in a region; internal sections divide via 1px hairlines (divide-hairline) or dashed perforations (.perf-x, .perf-y), never cards inside cards.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use <Icon name=\"...\" /> (1.75px stroke SVG) for all category, navigation, and action pictograms.",
+      "Do format every price, date, and count with .num (Roboto Mono, tabular-nums).",
+      "Do separate coupon headers, fare summaries, and action stubs with .perf-x, .perf-y, or 1px --hairline rules.",
+      "Do keep group discount/surcharge entry positive-only via the 3-mode selector (Không điều chỉnh, Giảm giá ưu đãi (−), Cộng phụ thu (+))."
+    ],
+    "donts": [
+      "Don't use Unicode emojis (🚌, 🏨, ✨, 🎁) anywhere in the UI.",
+      "Don't nest bordered cards inside bordered cards; use hairline-divided rows inside a single coupon container.",
+      "Don't render text inputs on every preset itinerary row in the customer customize modal; keep rows static until the user clicks Đổi lựa chọn or Bỏ mục này.",
+      "Don't use pure gray (#666, gray-500) on navy or tinted surfaces; always use the navy-tinted ink tokens (--ink-2, --ink-3, --navy-ink-2)."
+    ]
+  }
+}

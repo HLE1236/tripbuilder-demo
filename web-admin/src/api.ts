@@ -128,33 +128,37 @@ export function formatVnd(amount: number | null | undefined): string {
   return amount.toLocaleString('vi-VN') + 'đ';
 }
 
-export function statusBadge(status: BookingStatus): { bg: string; text: string } {
+/**
+ * Nhãn trạng thái đơn. `bg` là lớp màu (chữ + viền) theo hệ token "ví vé".
+ * `stamp` là chữ ngắn in trên con dấu.
+ */
+export function statusBadge(status: BookingStatus): { bg: string; text: string; stamp: string } {
   switch (status) {
     case 'BOOKED_ORIGINAL':
-      return { bg: 'bg-blue-100 text-blue-800 border-blue-300', text: '1. Khách gửi yêu cầu đặt tour (Giá chuẩn)' };
+      return { bg: 'text-navy dark:text-navy-ink bg-stock-2', text: 'Bước 1 · Đã gửi yêu cầu đặt tour', stamp: 'Đã xuất vé' };
     case 'WAITING_REQUOTE':
-      return { bg: 'bg-amber-100 text-amber-900 border-amber-400', text: '2. Đã tuỳ chỉnh · Chờ Guide báo giá chốt' };
+      return { bg: 'text-amber bg-amber-soft', text: 'Bước 2 · Đã tuỳ chỉnh, chờ Guide báo giá', stamp: 'Chờ báo giá' };
     case 'REQUOTED':
-      return { bg: 'bg-purple-100 text-purple-900 border-purple-400', text: '3. Guide đã báo giá chốt · Chờ khách đồng ý' };
+      return { bg: 'text-carbon bg-carbon-soft', text: 'Bước 3 · Guide đã báo giá, chờ khách đồng ý', stamp: 'Đã báo giá' };
     case 'CONFIRMED':
-      return { bg: 'bg-emerald-100 text-emerald-800 border-emerald-400', text: '4. Khách đã đồng ý & Hoàn tất' };
+      return { bg: 'text-green bg-green-soft', text: 'Bước 4 · Đã đồng ý & hoàn tất', stamp: 'Đã xác nhận' };
     case 'CANCELLED':
-      return { bg: 'bg-gray-200 text-gray-600 border-gray-300', text: 'Đã huỷ' };
+      return { bg: 'text-red bg-red-soft', text: 'Đơn đã huỷ', stamp: 'Void · Đã huỷ' };
   }
 }
 
 export function noteTypeBadge(noteType: string): { label: string; cls: string } {
   switch (noteType) {
     case 'MODIFIED':
-      return { label: '🔄 Đã đổi lựa chọn', cls: 'bg-amber-100 text-amber-800 border-amber-300' };
+      return { label: 'Đã đổi', cls: 'text-amber' };
     case 'REMOVED':
-      return { label: '✕ Đã bỏ mục này', cls: 'bg-rose-100 text-rose-700 border-rose-300' };
+      return { label: 'Đã bỏ', cls: 'text-red' };
     case 'CUSTOM':
-      return { label: '✨ Yêu cầu thêm', cls: 'bg-purple-100 text-purple-800 border-purple-300' };
+      return { label: 'Yêu cầu thêm', cls: 'text-carbon' };
     case 'GUIDE':
-      return { label: '🧭 Guide đã báo giá', cls: 'bg-blue-100 text-blue-800 border-blue-300' };
+      return { label: 'Guide đã báo giá', cls: 'text-green' };
     default:
-      return { label: '✓ Theo lịch trình chuẩn', cls: 'bg-gray-100 text-gray-600 border-gray-300' };
+      return { label: 'Theo lịch chuẩn', cls: 'text-ink-3' };
   }
 }
 

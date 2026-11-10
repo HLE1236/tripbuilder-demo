@@ -10,6 +10,7 @@ import {
   type Tour,
   type User,
 } from '../api';
+import Icon, { categoryIconName, type IconName } from './Icon';
 
 interface Props {
   tour: Tour;
@@ -20,21 +21,12 @@ interface Props {
   onSubmitted: (booking: Booking) => void;
 }
 
-const QUICK_CUSTOM_CHIPS = [
-  '🎂 Tổ chức sinh nhật / kỷ niệm tại phòng',
-  '🔥 Thêm tiệc nướng BBQ tối riêng cho đoàn',
-  '📸 Thuê thợ chụp ảnh đi cùng đoàn',
-  '🥗 Thực đơn ăn chay / kiêng hải sản',
+const QUICK_CUSTOM_CHIPS: { icon: IconName; text: string }[] = [
+  { icon: 'cake', text: 'Tổ chức sinh nhật / kỷ niệm tại phòng' },
+  { icon: 'flame', text: 'Thêm tiệc nướng BBQ tối riêng cho đoàn' },
+  { icon: 'camera', text: 'Thuê thợ chụp ảnh đi cùng đoàn' },
+  { icon: 'leaf', text: 'Thực đơn ăn chay / kiêng hải sản' },
 ];
-
-function categoryIcon(category: string): string {
-  const c = category.toLowerCase();
-  if (c.includes('di chuyển') || c.includes('xe')) return '🚌';
-  if (c.includes('khách sạn') || c.includes('lưu trú') || c.includes('resort')) return '🏨';
-  if (c.includes('ăn') || c.includes('ẩm thực')) return '🍲';
-  if (c.includes('yêu cầu')) return '✨';
-  return '🎟️';
-}
 
 export default function CustomerCustomizeModal({
   tour,
@@ -51,7 +43,6 @@ export default function CustomerCustomizeModal({
   const [guests, setGuests] = useState(existingBooking?.guests || 2);
   const [customerNote, setCustomerNote] = useState(existingBooking?.customerNote || '');
 
-  // Danh sách các dòng hoạt động trong lịch trình
   const [steps, setSteps] = useState<BookingStep[]>(() => {
     if (existingBooking) {
       return existingBooking.steps.map((s) => ({
@@ -71,29 +62,32 @@ export default function CustomerCustomizeModal({
     }));
   });
 
-  // Trạng thái đang mở bảng "Đổi lựa chọn khác" cho dòng thứ idx
   const [swappingIdx, setSwappingIdx] = useState<number | null>(null);
-  // Trạng thái đang mở bảng "+ Thêm hoạt động có sẵn" cho Ngày thứ d
   const [addingPresetDay, setAddingPresetDay] = useState<number | null>(null);
-
-  // Ô nhập nhanh yêu cầu mới của khách cho từng ngày
   const [customDraft, setCustomDraft] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getOptionsByRegion(tour.regionId).then(setOptions);
+    getOptionsByRegion(tour.regionId)
+      .then(setOptions)
+      .catch(() => setOptions([]));
   }, [tour.regionId]);
 
-  // Chỉ tính các hoạt động nằm trong số ngày đi đã chọn
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const activeSteps = steps.filter((s) => s.dayNumber <= days);
 
-  // Kiểm tra xem có ô nháp nào khách đang gõ dở không
   const hasPendingDraft = Object.entries(customDraft).some(
     ([d, text]) => Number(d) <= days && text.trim().length > 0
   );
 
-  // Khách chỉ thực sự thay đổi lịch trình khi đổi số ngày, đổi/bỏ/thêm hoạt động (ghi lời nhắn dặn dò vẫn giữ giá gốc!)
   const isModifiedFromOriginal =
     days !== tour.days ||
     activeSteps.length !== tour.steps.length ||
@@ -112,7 +106,6 @@ export default function CustomerCustomizeModal({
 
   const dayNumbers = Array.from({ length: days }, (_, i) => i + 1);
 
-  // 1. Đổi sang lựa chọn khác (Thay thế trực tiếp vào mục đang chọn, KHÔNG cộng dồn 2 khách sạn)
   const handleSwapStepWithOption = (idx: number, opt: PresetOption) => {
     setSteps((prev) =>
       prev.map((s, i) => {
@@ -134,7 +127,6 @@ export default function CustomerCustomizeModal({
     setSwappingIdx(null);
   };
 
-  // Khôi phục 1 mục đã đổi hoặc đã bỏ về mặc định ban đầu
   const handleRestoreStepToOriginal = (idx: number) => {
     setSteps((prev) =>
       prev.map((s, i) => {
@@ -150,16 +142,13 @@ export default function CustomerCustomizeModal({
     if (swappingIdx === idx) setSwappingIdx(null);
   };
 
-  // 2. Bấm [✕ Bỏ mục này] -> Gạch ngang (REMOVED, giá 0đ) và hiện nút [↺ Giữ lại]
   const handleSoftRemoveOrDeleteStep = (idx: number) => {
     setSteps((prev) => {
       const target = prev[idx];
       if (!target) return prev;
-      // Nếu là mục khách mới tự thêm ngoài lịch trình chuẩn -> Xoá hẳn khỏi danh sách
       if (target.noteType === 'CUSTOM' || !target.originalTitle) {
         return prev.filter((_, i) => i !== idx);
       }
-      // Nếu là mục có trong lịch trình gốc -> Đánh dấu REMOVED (0đ) để có thể bấm [↺ Giữ lại]
       return prev.map((s, i) =>
         i === idx
           ? {
@@ -175,7 +164,6 @@ export default function CustomerCustomizeModal({
     if (swappingIdx === idx) setSwappingIdx(null);
   };
 
-  // 3. Thêm 1 hoạt động có sẵn vào ngày (dành cho trường hợp muốn đi thêm điểm mới)
   const handleAddExtraPresetOption = (dayNumber: number, opt: PresetOption) => {
     setSteps((prev) => [
       ...prev,
@@ -192,7 +180,6 @@ export default function CustomerCustomizeModal({
     setAddingPresetDay(null);
   };
 
-  // 4. Thêm yêu cầu riêng từ thẻ 1 chạm hoặc ô nhập
   const handleAddCustomRequestText = (dayNumber: number, rawText: string) => {
     const text = rawText.trim();
     if (!text) return;
@@ -234,7 +221,6 @@ export default function CustomerCustomizeModal({
     setError('');
     setSubmitting(true);
     try {
-      // Tự động thu thập mọi nội dung khách đã gõ trong ô nháp nhưng quên bấm "+ Thêm"
       const autoSavedDraftSteps: BookingStep[] = [];
       for (let d = 1; d <= days; d++) {
         const draftText = (customDraft[d] || '').trim();
@@ -297,151 +283,151 @@ export default function CustomerCustomizeModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center p-2 sm:p-4 z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="customize-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-2 sm:p-4 anim-backdrop"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-200 flex flex-col"
+        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-hairline bg-stock shadow-lift anim-rise"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Banner đầu trang */}
-        <div className="relative h-44 bg-gray-900 shrink-0">
-          <img
-            src={tour.imageUrl}
-            alt={tour.title}
-            className="w-full h-full object-cover opacity-80"
-          />
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 bg-white/95 hover:bg-white text-gray-800 px-3 py-1.5 rounded-lg text-xs font-bold shadow cursor-pointer"
-          >
-            ✕ Đóng
-          </button>
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-4 text-white">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider bg-blue-600 px-2.5 py-0.5 rounded">
-                  {tour.regionName} ({tour.province}) · Chuẩn {tour.days}N{tour.days - 1}Đ
-                </span>
-                <h2 className="text-xl font-bold mt-1">{tour.title}</h2>
-                <p className="text-xs text-gray-200">
-                  🧭 Tour Guide bản địa phụ trách: <strong>{tour.guide.fullName}</strong> (
-                  {tour.guide.yearsExperience || 5} năm kinh nghiệm · ĐT: {tour.guide.phone})
-                </p>
-              </div>
-              <div className="text-right bg-black/45 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20">
-                <span className="text-[11px] text-gray-300 block">Giá lịch trình chuẩn</span>
-                <span className="text-lg font-extrabold text-amber-300">
-                  {formatVnd(tour.basePricePerPerson)} / khách
-                </span>
-              </div>
+        {/* Đầu vé (navy header) */}
+        <div className="bg-navy text-navy-ink px-5 py-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-navy-ink-2">
+              <span className="coupon-head text-[#f2c14e]">
+                {tour.regionName} ({tour.province}) · Chuẩn {tour.days}N{tour.days > 1 ? `${tour.days - 1}Đ` : ''}
+              </span>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1">
+                <Icon name="compass" size={13} />
+                Guide {tour.guide.fullName} ({tour.guide.phone})
+              </span>
             </div>
+            <h2 id="customize-modal-title" className="font-head text-2xl font-bold uppercase tracking-wide text-white">
+              {tour.title}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <span className="block text-[0.7rem] text-navy-ink-2">Giá lịch trình chuẩn</span>
+              <span className="num text-lg font-bold text-[#f2c14e]">
+                {formatVnd(tour.basePricePerPerson)}
+              </span>
+              <span className="text-xs text-navy-ink-2">/khách</span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng hộp thoại"
+              className="btn btn-sm border-white/20 bg-white/10 text-white hover:bg-white/20"
+            >
+              <Icon name="x" size={15} />
+              Đóng
+            </button>
           </div>
         </div>
 
-        {/* Form đặt & tuỳ chỉnh */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+        {/* Thân vé (cuộn) */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm font-medium">
-              ⚠️ {error}
+            <div role="alert" className="flex items-center gap-2 rounded-md border border-red/40 bg-red-soft px-4 py-3 text-sm text-ink">
+              <Icon name="alert" size={16} className="text-red" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Bước 1: Thông tin khởi hành */}
-          <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                Khách hàng đặt
-              </label>
-              <div className="px-3 py-2 bg-white border border-gray-200 rounded-lg font-semibold text-gray-800 truncate">
-                👤 {customer.fullName}
-              </div>
+          {/* Hàng thông số chuyến đi (4 ô kẻ hairline như cuống vé) */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 rounded-lg border border-hairline bg-stock-2 divide-y sm:divide-y-0 sm:divide-x divide-hairline">
+            <div className="p-3.5">
+              <span className="coupon-head block text-[0.7rem] text-ink-3">Hành khách</span>
+              <p className="mt-1 flex items-center gap-1.5 font-semibold text-sm text-ink truncate">
+                <Icon name="user" size={15} className="text-ink-3" />
+                {customer.fullName}
+              </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                Ngày khởi hành *
+            <div className="p-3.5">
+              <label htmlFor="booking-start-date" className="coupon-head block text-[0.7rem] text-ink-3">
+                Ngày khởi hành
               </label>
               <input
+                id="booking-start-date"
                 type="date"
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 font-medium"
+                className="field mt-1 py-1 text-sm num"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                Số khách tham gia *
-              </label>
-              <div className="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden">
+            <div className="p-3.5">
+              <span className="coupon-head block text-[0.7rem] text-ink-3">Số khách tham gia</span>
+              <div className="mt-1 flex items-center justify-between rounded-md border border-hairline-strong bg-stock px-1.5 py-0.5">
                 <button
                   type="button"
+                  aria-label="Giảm số khách"
                   onClick={() => setGuests((g) => Math.max(1, g - 1))}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 font-bold text-gray-700 cursor-pointer"
+                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
                 >
-                  −
+                  <Icon name="minus" size={14} />
                 </button>
-                <span className="flex-1 text-center font-bold text-blue-700">
-                  {guests} khách
-                </span>
+                <span className="num text-sm font-bold text-carbon">{guests} khách</span>
                 <button
                   type="button"
+                  aria-label="Tăng số khách"
                   onClick={() => setGuests((g) => Math.min(30, g + 1))}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 font-bold text-gray-700 cursor-pointer"
+                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
                 >
-                  +
+                  <Icon name="plus" size={14} />
                 </button>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
+            <div className="p-3.5">
+              <span className="coupon-head block text-[0.7rem] text-ink-3">
                 Thời lượng (chuẩn {tour.days} ngày)
-              </label>
-              <div className="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden">
+              </span>
+              <div className="mt-1 flex items-center justify-between rounded-md border border-hairline-strong bg-stock px-1.5 py-0.5">
                 <button
                   type="button"
+                  aria-label="Giảm số ngày"
                   onClick={() => setDays((d) => Math.max(1, d - 1))}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 font-bold text-gray-700 cursor-pointer"
+                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
                 >
-                  −
+                  <Icon name="minus" size={14} />
                 </button>
-                <span className="flex-1 text-center font-bold text-gray-800">
-                  {days} ngày
-                </span>
+                <span className="num text-sm font-bold text-ink">{days} ngày</span>
                 <button
                   type="button"
+                  aria-label="Tăng số ngày"
                   onClick={() => setDays((d) => Math.min(7, d + 1))}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 font-bold text-gray-700 cursor-pointer"
+                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
                 >
-                  +
+                  <Icon name="plus" size={14} />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Bước 2: Timeline Lịch trình trực quan — Xem trước, bấm nút để Đổi hoặc Bỏ */}
+          {/* Danh sách các tờ coupon theo từng ngày */}
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h3 className="text-base font-bold text-gray-900">
-                  Lịch trình chi tiết từng ngày
+                <h3 className="font-head text-xl font-bold uppercase tracking-wide text-ink">
+                  Các chặng trong lịch trình
                 </h3>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  Ưng ý lịch trình chuẩn? Bạn chỉ cần bấm <strong>Đặt ngay</strong> ở cuối trang. Muốn thay đổi mục nào, hãy bấm nút{' '}
-                  <span className="font-semibold text-blue-700">🔄 Đổi lựa chọn khác</span> hoặc{' '}
-                  <span className="font-semibold text-rose-600">✕ Bỏ mục này</span>.
+                <p className="text-xs text-ink-2">
+                  Ưng ý lịch trình chuẩn? Bấm <strong>Đặt ngay</strong> ở cuối phiếu. Muốn đổi khách sạn hay bỏ mục nào, bấm nút ngay trên dòng đó.
                 </p>
               </div>
               {isModifiedFromOriginal && (
-                <button
-                  type="button"
-                  onClick={handleResetToPreset}
-                  className="px-3 py-1.5 rounded-lg bg-white border border-blue-300 text-xs text-blue-700 hover:bg-blue-50 font-bold cursor-pointer shadow-2xs"
-                >
-                  ↺ Khôi phục toàn bộ về lịch trình gốc
+                <button type="button" onClick={handleResetToPreset} className="btn btn-ghost btn-sm">
+                  <Icon name="undo" size={14} />
+                  Khôi phục lịch trình gốc
                 </button>
               )}
             </div>
@@ -452,204 +438,170 @@ export default function CustomerCustomizeModal({
                 .filter((s) => s.dayNumber === day);
 
               return (
-                <div
+                <section
                   key={day}
-                  className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-2xs"
+                  aria-label={`Lịch trình ngày ${day}`}
+                  className="rounded-lg border border-hairline bg-stock shadow-coupon overflow-hidden"
                 >
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                  <div className="bg-stock-2 px-4 py-2.5 border-b border-hairline flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold">
-                        NGÀY {day}
-                      </span>
+                      <span className="coupon-head text-sm text-ink">Coupon ngày {day}</span>
                       {day > tour.days && (
-                        <span className="text-xs font-semibold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                          Ngày mở rộng thêm
-                        </span>
+                        <span className="stamp text-amber">Ngày mở rộng</span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {daySteps.filter((s) => s.noteType !== 'REMOVED').length} hoạt động được chọn
+                    <span className="num text-xs text-ink-3">
+                      {daySteps.filter((s) => s.noteType !== 'REMOVED').length} hoạt động
                     </span>
                   </div>
 
-                  {/* Thông báo thân thiện nếu khách vừa tăng thêm ngày mới chưa có hoạt động */}
                   {daySteps.length === 0 && (
-                    <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900">
-                      ✨ <strong>Bạn vừa thêm Ngày {day} vào chuyến đi!</strong> Hãy bấm chọn hoạt động gợi ý bên dưới hoặc gõ mong muốn của bạn để Tour Guide sắp xếp lịch trình Ngày {day} giúp đoàn nhé.
+                    <div className="px-4 py-4 text-sm text-amber bg-amber-soft">
+                      Bạn vừa thêm Ngày {day}. Hãy chọn hoạt động gợi ý bên dưới hoặc ghi yêu cầu để Guide sắp xếp lịch trình cho Ngày {day}.
                     </div>
                   )}
 
-                  {/* Danh sách các thẻ hoạt động trong ngày (Timeline Cards) */}
-                  <div className="space-y-2.5">
+                  <div className="divide-y divide-hairline">
                     {daySteps.map((st) => {
                       const isRemoved = st.noteType === 'REMOVED';
                       const isModified = st.noteType === 'MODIFIED';
                       const isCustom = st.noteType === 'CUSTOM';
                       const isSwappingThis = swappingIdx === st.idx;
 
-                      // Lọc các lựa chọn cùng danh mục trước, nếu không có thì hiển thị toàn bộ gợi ý vùng
                       const sameCategoryOptions = options.filter(
                         (o) => o.category.toLowerCase() === st.category.toLowerCase()
                       );
                       const swapCandidates =
                         sameCategoryOptions.length > 0 ? sameCategoryOptions : options;
-
-                      const basePriceForDiff =
-                        st.originalPricePerPerson ?? st.pricePerPerson;
+                      const basePriceForDiff = st.originalPricePerPerson ?? st.pricePerPerson;
 
                       return (
-                        <div key={st.idx} className="space-y-2">
-                          <div
-                            className={`rounded-xl p-3 border transition-all flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 ${
-                              isRemoved
-                                ? 'bg-gray-50 border-gray-200 opacity-65'
-                                : isCustom
-                                ? 'bg-purple-50/70 border-purple-300'
-                                : isModified
-                                ? 'bg-amber-50/70 border-amber-300'
-                                : 'bg-gray-50/60 border-gray-200 hover:border-blue-300'
-                            }`}
-                          >
-                            {/* Cột trái: Icon danh mục + Tên hoạt động + Dòng so sánh gốc */}
+                        <div
+                          key={st.idx}
+                          className={`px-4 py-3 ${
+                            isRemoved
+                              ? 'bg-stock-2/70'
+                              : isCustom
+                              ? 'bg-carbon-soft/60'
+                              : isModified
+                              ? 'bg-amber-soft/60'
+                              : ''
+                          }`}
+                        >
+                          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
                             <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-700 shrink-0 shadow-2xs">
-                                {categoryIcon(st.category)} {st.category}
+                              <span className="mt-0.5 inline-flex items-center gap-1 rounded border border-hairline bg-stock-2 px-2 py-0.5 text-xs font-medium text-ink-2 shrink-0">
+                                <Icon name={categoryIconName(st.category)} size={13} />
+                                {st.category}
                               </span>
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span
-                                    className={`text-sm font-bold ${
-                                      isRemoved
-                                        ? 'line-through text-gray-400'
-                                        : 'text-gray-900'
+                                    className={`text-sm font-semibold ${
+                                      isRemoved ? 'line-through text-ink-3' : 'text-ink'
                                     }`}
                                   >
                                     {st.title}
                                   </span>
-
-                                  {isModified && (
-                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-200/80 text-amber-900">
-                                      🔄 Đã đổi lựa chọn
-                                    </span>
-                                  )}
-                                  {isRemoved && (
-                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700">
-                                      ✕ Đã bỏ mục này
-                                    </span>
-                                  )}
-                                  {isCustom && (
-                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-200/80 text-purple-900">
-                                      ✨ Yêu cầu thêm
-                                    </span>
-                                  )}
+                                  {isModified && <span className="stamp text-amber">Đã đổi</span>}
+                                  {isRemoved && <span className="stamp text-red">Void · Đã bỏ</span>}
+                                  {isCustom && <span className="stamp text-carbon">Yêu cầu thêm</span>}
                                 </div>
 
-                                {/* Nếu đã đổi từ mục gốc -> Hiện rõ "Đã đổi từ: ..." để khách không bao giờ nhầm */}
                                 {isModified && st.originalTitle && (
-                                  <p className="text-xs text-gray-500 mt-0.5">
-                                    Đã thay thế cho:{' '}
+                                  <p className="text-xs text-ink-3 mt-0.5">
+                                    Thay cho mặc định:{' '}
                                     <span className="line-through">
-                                      {st.originalTitle} (
-                                      {formatVnd(st.originalPricePerPerson)}/khách)
+                                      {st.originalTitle} ({formatVnd(st.originalPricePerPerson)}/khách)
                                     </span>
                                   </p>
                                 )}
                                 {isRemoved && st.originalPricePerPerson != null && (
-                                  <p className="text-xs text-rose-600 mt-0.5">
-                                    Đã giảm trừ {formatVnd(st.originalPricePerPerson)}/khách khỏi lịch trình gốc
+                                  <p className="text-xs text-red mt-0.5">
+                                    Đã trừ <span className="num">{formatVnd(st.originalPricePerPerson)}</span>/khách khỏi lịch trình chuẩn
                                   </p>
                                 )}
                               </div>
                             </div>
 
-                            {/* Cột phải: Đơn giá & Nút thao tác 1 chạm */}
                             <div className="flex flex-wrap items-center gap-2 shrink-0">
                               <div className="text-right mr-1">
                                 {isRemoved ? (
-                                  <span className="text-xs font-bold text-gray-400">
-                                    0đ (Đã bỏ)
-                                  </span>
+                                  <span className="num text-xs font-semibold text-ink-3">0đ</span>
                                 ) : isCustom && st.pricePerPerson === 0 ? (
-                                  <span className="text-xs font-bold text-purple-800 bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200">
-                                    ⏳ Chờ Guide báo giá
+                                  <span className="text-xs font-semibold text-carbon">
+                                    Chờ Guide báo giá
                                   </span>
                                 ) : (
-                                  <span className="text-sm font-extrabold text-blue-700">
+                                  <span className="num text-sm font-bold text-carbon">
                                     {formatVnd(st.pricePerPerson)}
-                                    <span className="text-xs font-normal text-gray-500">
-                                      /khách
-                                    </span>
+                                    <span className="font-sans text-xs font-normal text-ink-3">/khách</span>
                                   </span>
                                 )}
                               </div>
 
-                              {/* Nút Đổi lựa chọn khác (chỉ hiện cho mục chưa bị bỏ và không phải yêu cầu tự gõ) */}
                               {!isRemoved && !isCustom && swapCandidates.length > 0 && (
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    setSwappingIdx(isSwappingThis ? null : st.idx)
-                                  }
-                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                                    isSwappingThis
-                                      ? 'bg-blue-600 text-white border-blue-600'
-                                      : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-300'
-                                  }`}
+                                  aria-expanded={isSwappingThis}
+                                  onClick={() => setSwappingIdx(isSwappingThis ? null : st.idx)}
+                                  className="btn btn-ghost btn-sm"
                                 >
-                                  🔄 {isSwappingThis ? 'Đóng bảng đổi' : 'Đổi lựa chọn khác'}
+                                  <Icon name="swap" size={13} />
+                                  {isSwappingThis ? 'Đóng' : 'Đổi lựa chọn'}
                                 </button>
                               )}
 
-                              {/* Nếu mục đã bị đổi -> Hiện nút khôi phục về mặc định */}
                               {isModified && st.originalTitle && (
                                 <button
                                   type="button"
                                   onClick={() => handleRestoreStepToOriginal(st.idx)}
-                                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 cursor-pointer"
-                                  title="Quay lại lựa chọn mặc định của Tour"
+                                  className="btn btn-ghost btn-sm"
+                                  title="Quay lại lựa chọn mặc định"
                                 >
-                                  ↺ Mặc định
+                                  <Icon name="undo" size={13} />
+                                  Mặc định
                                 </button>
                               )}
 
-                              {/* Nút Bỏ mục này HOẶC Giữ lại */}
                               {isRemoved ? (
                                 <button
                                   type="button"
                                   onClick={() => handleRestoreStepToOriginal(st.idx)}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-2xs"
+                                  className="btn btn-confirm btn-sm"
                                 >
-                                  ↺ Giữ lại mục này
+                                  <Icon name="undo" size={13} />
+                                  Giữ lại
                                 </button>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() => handleSoftRemoveOrDeleteStep(st.idx)}
-                                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 cursor-pointer"
+                                  className="btn btn-danger btn-sm"
                                 >
-                                  ✕ Bỏ mục này
+                                  <Icon name="x" size={13} />
+                                  Bỏ mục này
                                 </button>
                               )}
                             </div>
                           </div>
 
-                          {/* Hộp chọn "Đổi lựa chọn khác" sổ xuống ngay bên dưới mục đang chọn */}
+                          {/* Bảng chọn dịch vụ thay thế */}
                           {isSwappingThis && (
-                            <div className="bg-blue-50/90 border-2 border-blue-300 rounded-xl p-3.5 space-y-2.5 ml-2 sm:ml-6">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-blue-900">
-                                  🔄 Chọn dịch vụ thay thế cho "{st.originalTitle || st.title}" (Hệ thống sẽ tự động đổi, không bị trùng lặp):
+                            <div className="mt-3 rounded-md border border-hairline-strong bg-stock-2 p-3 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-ink">
+                                  Chọn dịch vụ thay cho “{st.originalTitle || st.title}” (thay thế trực tiếp, không cộng trùng):
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => setSwappingIdx(null)}
-                                  className="text-xs text-gray-500 hover:text-gray-800 cursor-pointer"
+                                  className="text-xs text-ink-3 hover:text-ink cursor-pointer"
                                 >
-                                  ✕ Đóng
+                                  Đóng
                                 </button>
                               </div>
-
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {swapCandidates.map((opt) => {
                                   const diff = opt.pricePerPerson - basePriceForDiff;
@@ -659,41 +611,24 @@ export default function CustomerCustomizeModal({
                                       key={opt.id}
                                       type="button"
                                       onClick={() => handleSwapStepWithOption(st.idx, opt)}
-                                      className={`text-left p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                                      className={`text-left rounded-md border p-2.5 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
                                         isSelected
-                                          ? 'bg-blue-600 text-white border-blue-700 font-bold'
-                                          : 'bg-white hover:border-blue-500 border-gray-200 text-gray-800'
+                                          ? 'border-carbon bg-carbon-soft text-ink'
+                                          : 'border-hairline bg-stock hover:border-ink-3 text-ink'
                                       }`}
                                     >
                                       <div className="min-w-0">
-                                        <span className="text-xs font-bold block truncate">
-                                          {opt.title}
-                                        </span>
-                                        <span
-                                          className={`text-[11px] ${
-                                            isSelected ? 'text-blue-100' : 'text-gray-500'
-                                          }`}
-                                        >
-                                          Đơn giá: {formatVnd(opt.pricePerPerson)}/khách
+                                        <span className="block text-xs font-semibold truncate">{opt.title}</span>
+                                        <span className="num text-[0.72rem] text-ink-3">
+                                          {formatVnd(opt.pricePerPerson)}/khách
                                         </span>
                                       </div>
-
                                       <span
-                                        className={`text-[11px] font-extrabold px-2 py-0.5 rounded shrink-0 ${
-                                          isSelected
-                                            ? 'bg-white/20 text-white'
-                                            : diff > 0
-                                            ? 'bg-amber-100 text-amber-900'
-                                            : diff < 0
-                                            ? 'bg-emerald-100 text-emerald-800'
-                                            : 'bg-gray-100 text-gray-600'
+                                        className={`num text-xs font-bold shrink-0 ${
+                                          diff > 0 ? 'text-amber' : diff < 0 ? 'text-green' : 'text-ink-3'
                                         }`}
                                       >
-                                        {diff > 0
-                                          ? `+${formatVnd(diff)}`
-                                          : diff < 0
-                                          ? `${formatVnd(diff)}`
-                                          : 'Bằng giá gốc'}
+                                        {diff > 0 ? `+${formatVnd(diff)}` : diff < 0 ? formatVnd(diff) : '0đ'}
                                       </span>
                                     </button>
                                   );
@@ -706,50 +641,48 @@ export default function CustomerCustomizeModal({
                     })}
                   </div>
 
-                  {/* Khu vực Thêm hoạt động hoặc Yêu cầu riêng cho Ngày này */}
-                  <div className="pt-2 border-t border-gray-100 space-y-2.5">
+                  {/* Cuống thêm hoạt động / yêu cầu riêng của ngày */}
+                  <div className="perf-x bg-stock-2 px-4 py-3 space-y-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-gray-500 mr-1">
-                        ⚡ Bấm 1 chạm để thêm nhanh vào Ngày {day}:
+                      <span className="coupon-head text-[0.7rem] text-ink-3 mr-1">
+                        Thêm nhanh vào Ngày {day}:
                       </span>
-
                       {options.length > 0 && (
                         <button
                           type="button"
-                          onClick={() =>
-                            setAddingPresetDay(addingPresetDay === day ? null : day)
-                          }
-                          className="text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full cursor-pointer"
+                          aria-pressed={addingPresetDay === day}
+                          onClick={() => setAddingPresetDay(addingPresetDay === day ? null : day)}
+                          className="chip"
                         >
-                          + Thêm điểm tham quan / dịch vụ có sẵn
+                          <Icon name="plus" size={13} />
+                          Dịch vụ có sẵn tại {tour.regionName}
                         </button>
                       )}
-
-                      {QUICK_CUSTOM_CHIPS.map((chip) => (
+                      {QUICK_CUSTOM_CHIPS.map((c) => (
                         <button
-                          key={chip}
+                          key={c.text}
                           type="button"
-                          onClick={() => handleAddCustomRequestText(day, chip)}
-                          className="text-[11px] bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 px-2.5 py-1 rounded-full transition-colors cursor-pointer font-medium"
+                          onClick={() => handleAddCustomRequestText(day, c.text)}
+                          className="chip"
                         >
-                          + {chip}
+                          <Icon name={c.icon} size={13} />
+                          {c.text}
                         </button>
                       ))}
                     </div>
 
-                    {/* Nếu khách mở bảng "+ Thêm điểm tham quan / dịch vụ có sẵn" */}
                     {addingPresetDay === day && options.length > 0 && (
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
+                      <div className="rounded-md border border-hairline bg-stock p-3 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-700">
-                            Chọn dịch vụ có sẵn tại {tour.regionName} để cộng thêm vào Ngày {day}:
+                          <span className="text-xs font-semibold text-ink">
+                            Chọn dịch vụ cộng thêm vào Ngày {day}:
                           </span>
                           <button
                             type="button"
                             onClick={() => setAddingPresetDay(null)}
-                            className="text-xs text-gray-500 hover:text-gray-800 cursor-pointer"
+                            className="text-xs text-ink-3 hover:text-ink cursor-pointer"
                           >
-                            ✕ Đóng
+                            Đóng
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
@@ -758,134 +691,113 @@ export default function CustomerCustomizeModal({
                               key={opt.id}
                               type="button"
                               onClick={() => handleAddExtraPresetOption(day, opt)}
-                              className="text-xs bg-white hover:bg-blue-50 hover:border-blue-400 border border-gray-300 text-gray-800 px-3 py-1.5 rounded-lg cursor-pointer font-medium"
+                              className="chip"
                             >
-                              + {opt.title} ({formatVnd(opt.pricePerPerson)}/khách)
+                              <Icon name="plus" size={12} />
+                              {opt.title}
+                              <span className="num text-xs text-carbon">{formatVnd(opt.pricePerPerson)}</span>
                             </button>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Ô tự gõ thêm yêu cầu riêng của khách vào ngày này (tự động lưu cả khi quên bấm nút + Thêm) */}
                     <div className="flex gap-2">
+                      <label className="sr-only" htmlFor={`custom-day-${day}`}>
+                        Yêu cầu riêng cho Ngày {day}
+                      </label>
                       <input
+                        id={`custom-day-${day}`}
                         type="text"
                         value={customDraft[day] || ''}
-                        onChange={(e) =>
-                          setCustomDraft((prev) => ({ ...prev, [day]: e.target.value }))
-                        }
+                        onChange={(e) => setCustomDraft((prev) => ({ ...prev, [day]: e.target.value }))}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             handleAddCustomRequestText(day, customDraft[day] || '');
                           }
                         }}
-                        placeholder={`Hoặc tự gõ yêu cầu riêng cho Ngày ${day} tại đây (VD: Muốn ghé chợ hải sản mua quà, thuê xe máy riêng...)`}
-                        className="flex-1 bg-gray-50 focus:bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:border-purple-500 focus:outline-none"
+                        placeholder={`Hoặc tự gõ yêu cầu riêng cho Ngày ${day} (VD: ghé chợ hải sản, thuê xe máy riêng...)`}
+                        className="field text-xs py-1.5"
                       />
                       <button
                         type="button"
-                        onClick={() =>
-                          handleAddCustomRequestText(day, customDraft[day] || '')
-                        }
-                        className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold cursor-pointer shrink-0"
+                        onClick={() => handleAddCustomRequestText(day, customDraft[day] || '')}
+                        className="btn btn-ghost btn-sm"
                       >
-                        + Thêm vào Ngày {day}
+                        <Icon name="plus" size={14} />
+                        Thêm
                       </button>
                     </div>
                   </div>
-                </div>
+                </section>
               );
             })}
           </div>
 
-          {/* Ghi chú dặn dò chung (Không làm mất trạng thái Giá chuẩn nếu khách không sửa lịch trình) */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm">
-            <label className="block font-bold text-gray-800 mb-1">
-              💬 Lời nhắn dặn dò gửi cho Tour Guide {tour.guide.fullName} (Không bắt buộc)
+          {/* Lời nhắn dặn dò chung */}
+          <div>
+            <label htmlFor="customer-note" className="block text-sm font-semibold text-ink mb-1">
+              Lời nhắn dặn dò gửi Guide {tour.guide.fullName} (không bắt buộc)
             </label>
             <textarea
+              id="customer-note"
               rows={2}
               value={customerNote}
               onChange={(e) => setCustomerNote(e.target.value)}
               placeholder="VD: Đoàn có trẻ nhỏ và người lớn tuổi, nhờ Guide sắp xếp giờ giấc thư thả..."
-              className="w-full bg-white border border-gray-300 rounded-lg px-3.5 py-2 text-sm"
+              className="field"
             />
-            <span className="text-[11px] text-gray-500 mt-1 block">
-              * Nếu bạn giữ nguyên lịch trình chuẩn và chỉ ghi lời nhắn dặn dò tại đây, đơn vẫn được giữ nguyên mức Giá chuẩn ban đầu.
-            </span>
+            <p className="mt-1 text-xs text-ink-3">
+              Nếu bạn giữ nguyên lịch trình chuẩn và chỉ ghi lời nhắn dặn dò tại đây, đơn vẫn giữ nguyên giá chuẩn.
+            </p>
           </div>
 
-          {/* Thanh tổng kết giá & Nút Đặt Tour */}
-          <div
-            className={`rounded-xl p-4 border-2 flex flex-wrap items-center justify-between gap-4 ${
-              isModifiedFromOriginal
-                ? 'bg-amber-50/90 border-amber-300'
-                : 'bg-emerald-50/90 border-emerald-300'
-            }`}
-          >
+          {/* Cuống tổng kết giá & nút gửi */}
+          <div className="perf-x pt-4 flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`text-xs font-extrabold uppercase px-2.5 py-0.5 rounded ${
-                    isModifiedFromOriginal
-                      ? 'bg-amber-200 text-amber-900'
-                      : 'bg-emerald-200 text-emerald-900'
-                  }`}
-                >
-                  {isModifiedFromOriginal
-                    ? '✨ Lịch trình đã tuỳ chỉnh → Tour Guide sẽ kiểm tra & báo giá chốt'
-                    : '✓ Giữ nguyên lịch trình chuẩn của Tour'}
+                <span className={`stamp ${isModifiedFromOriginal ? 'text-amber' : 'text-green'}`}>
+                  {isModifiedFromOriginal ? 'Đã tuỳ chỉnh · Chờ báo giá' : 'Giữ lịch trình chuẩn'}
                 </span>
-
                 {isModifiedFromOriginal && priceDiffPerPerson !== 0 && (
-                  <span className="text-xs font-bold text-gray-700">
-                    (Chênh lệch dự kiến:{' '}
-                    {priceDiffPerPerson > 0
-                      ? `+${formatVnd(priceDiffPerPerson)}`
-                      : formatVnd(priceDiffPerPerson)}
-                    /khách so với giá chuẩn)
+                  <span className="text-xs text-ink-2">
+                    Chênh lệch tạm tính:{' '}
+                    <strong className="num text-carbon">
+                      {priceDiffPerPerson > 0 ? `+${formatVnd(priceDiffPerPerson)}` : formatVnd(priceDiffPerPerson)}
+                    </strong>
+                    /khách
                   </span>
                 )}
               </div>
 
-              <p className="text-xl font-extrabold text-gray-900">
-                Tổng tạm tính: {formatVnd(estimatedPerPerson)}/khách × {guests} khách ={' '}
-                <span className="text-blue-700">{formatVnd(estimatedTotal)}</span>
+              <p className="text-lg font-bold text-ink">
+                Tạm tính:{' '}
+                <span className="num">{formatVnd(estimatedPerPerson)}</span>/khách ×{' '}
+                <span className="num">{guests}</span> khách ={' '}
+                <span className="num text-xl text-carbon">{formatVnd(estimatedTotal)}</span>
               </p>
 
               {hasCustomUnpriced && (
-                <p className="text-xs font-semibold text-purple-800">
-                  * Bạn có yêu cầu thêm mới chưa có sẵn đơn giá — Tour Guide {tour.guide.fullName} sẽ điền giá chi tiết và gửi lại cho bạn duyệt.
+                <p className="text-xs text-carbon">
+                  Mục bạn yêu cầu thêm sẽ được Guide {tour.guide.fullName} điền giá và gửi lại để bạn duyệt.
                 </p>
               )}
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-gray-700 cursor-pointer"
-              >
-                Đóng
+              <button type="button" onClick={onClose} className="btn btn-ghost">
+                Huỷ
               </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className={`px-6 py-2.5 rounded-xl text-white text-sm font-extrabold shadow-sm cursor-pointer disabled:opacity-50 ${
-                  isModifiedFromOriginal
-                    ? 'bg-amber-600 hover:bg-amber-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
+              <button type="submit" disabled={submitting} className="btn btn-primary btn-lg">
+                <Icon name={isModifiedFromOriginal ? 'send' : 'check'} size={16} />
                 {submitting
-                  ? 'Đang gửi yêu cầu...'
+                  ? 'Đang gửi...'
                   : existingBooking
-                  ? '📨 Lưu lịch trình & Gửi Guide báo giá lại'
+                  ? 'Lưu & gửi Guide báo giá lại'
                   : isModifiedFromOriginal
-                  ? '📨 Gửi lịch trình tuỳ chỉnh & Nhờ Guide báo giá'
-                  : '✓ Đặt ngay theo lịch trình chuẩn'}
+                  ? 'Gửi lịch trình & nhờ Guide báo giá'
+                  : 'Đặt ngay theo lịch trình chuẩn'}
               </button>
             </div>
           </div>

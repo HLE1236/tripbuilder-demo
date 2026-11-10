@@ -1,1 +1,276 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ */
+/* TripBuilder — "ví vé" (ticket wallet) tokens                        */
+/* Raw values live on :root / .dark; Tailwind utilities read them.     */
+/* ------------------------------------------------------------------ */
+:root {
+  --ground: #eef1f5;          /* cool paper the wallet lies on */
+  --stock: #ffffff;           /* coupon stock */
+  --stock-2: #f6f8fb;         /* stub / second neutral layer */
+  --hairline: #d6dce5;
+  --hairline-strong: #b9c2cf;
+  --ink: #121a26;
+  --ink-2: #475467;           /* secondary text, navy-tinted */
+  --ink-3: #6b778a;
+
+  --navy: #0f2a4a;            /* carrier navy: shell */
+  --navy-2: #173a63;
+  --navy-ink: #e9eff7;        /* text on navy */
+  --navy-ink-2: #a9bbd3;
+
+  --red: #c8102e;             /* carrier red: void / destructive only */
+  --red-soft: #fdecef;
+  --carbon: #4b2e83;          /* carbon purple: every filled figure */
+  --carbon-soft: #f1ecfa;
+  --amber: #a15c00;           /* pending */
+  --amber-soft: #fdf3e2;
+  --green: #17734a;           /* validated */
+  --green-soft: #e6f4ec;
+
+  --shadow-coupon: 0 1px 2px rgb(15 42 74 / 0.06), 0 6px 18px -8px rgb(15 42 74 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(15 42 74 / 0.08), 0 16px 32px -12px rgb(15 42 74 / 0.28);
+}
+
+.dark {
+  --ground: #08111e;
+  --stock: #111d2e;
+  --stock-2: #0d1827;
+  --hairline: #22324a;
+  --hairline-strong: #31445f;
+  --ink: #e8edf4;
+  --ink-2: #a8b5c7;
+  --ink-3: #8592a6;
+
+  --navy: #0a1a2f;
+  --navy-2: #13294a;
+  --navy-ink: #e9eff7;
+  --navy-ink-2: #9fb1c9;
+
+  --red: #ff5c72;
+  --red-soft: #3a1520;
+  --carbon: #b9a2f5;
+  --carbon-soft: #241a3d;
+  --amber: #f0b45a;
+  --amber-soft: #33240e;
+  --green: #5fd39a;
+  --green-soft: #10301f;
+
+  --shadow-coupon: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 20px -10px rgb(0 0 0 / 0.6);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.45), 0 18px 36px -14px rgb(0 0 0 / 0.7);
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-stock: var(--stock);
+  --color-stock-2: var(--stock-2);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-navy-ink: var(--navy-ink);
+  --color-navy-ink-2: var(--navy-ink-2);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-carbon: var(--carbon);
+  --color-carbon-soft: var(--carbon-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+  --font-head: "Barlow Condensed", "Be Vietnam Pro", ui-sans-serif, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, monospace;
+
+  --shadow-coupon: var(--shadow-coupon);
+  --shadow-lift: var(--shadow-lift);
+}
+
+/* ------------------------------------------------------------------ */
+/* Base & browser surfaces                                             */
+/* ------------------------------------------------------------------ */
+html {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+html.dark { color-scheme: dark; }
+
+body { margin: 0; min-height: 100vh; }
+
+::selection { background: var(--carbon); color: var(--stock); }
+
+:focus-visible {
+  outline: 2px solid var(--carbon);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+input, select, textarea { caret-color: var(--carbon); accent-color: var(--carbon); }
+
+a { text-underline-offset: 3px; }
+
+* { scrollbar-color: var(--hairline-strong) transparent; }
+
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+/* Condensed caps for coupon heads */
+.coupon-head {
+  font-family: var(--font-head);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* Perforation: a dashed rule with punched semicircles at each end */
+.perf-x {
+  position: relative;
+  border-top: 1.5px dashed var(--hairline-strong);
+}
+.perf-x::before,
+.perf-x::after {
+  content: "";
+  position: absolute;
+  top: -9px;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--ground);
+}
+.perf-x::before { left: -9px; }
+.perf-x::after { right: -9px; }
+
+@utility perf-y {
+  border-left: 1.5px dashed var(--hairline-strong);
+}
+
+/* Rubber stamp */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-head);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.28rem 0.5rem;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  transform: rotate(-2deg);
+  white-space: nowrap;
+}
+
+/* Form controls in the wallet vocabulary */
+.field {
+  width: 100%;
+  background: var(--stock);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.field::placeholder { color: var(--ink-3); }
+.field:hover { border-color: var(--ink-3); }
+.field:focus { outline: none; border-color: var(--carbon); box-shadow: 0 0 0 3px var(--carbon-soft); }
+.field:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-sm { font-size: 0.8rem; padding: 0.38rem 0.7rem; }
+.btn-lg { font-size: 0.95rem; padding: 0.75rem 1.35rem; }
+
+.btn-primary { background: var(--navy); color: var(--navy-ink); }
+.btn-primary:hover:not(:disabled) { background: var(--navy-2); }
+.dark .btn-primary { background: var(--carbon); color: #140b26; }
+.dark .btn-primary:hover:not(:disabled) { background: #cdbcfa; }
+
+.btn-confirm { background: var(--green); color: #fff; }
+.btn-confirm:hover:not(:disabled) { filter: brightness(1.08); }
+.dark .btn-confirm { color: #06210f; }
+
+.btn-ghost { background: var(--stock); color: var(--ink); border-color: var(--hairline-strong); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--ink-3); background: var(--stock-2); }
+
+.btn-danger { background: transparent; color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+.btn-danger:hover:not(:disabled) { background: var(--red-soft); }
+
+.btn-link { background: transparent; color: var(--carbon); padding-left: 0; padding-right: 0; }
+.btn-link:hover { text-decoration: underline; }
+
+/* Chip (toggle/filter) */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--hairline-strong);
+  background: var(--stock);
+  color: var(--ink-2);
+  border-radius: 9999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--ink-3); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--navy-ink); }
+.dark .chip[aria-pressed="true"] { background: var(--carbon); border-color: var(--carbon); color: #140b26; }
+
+/* ------------------------------------------------------------------ */
+/* Motion: one authored moment (tear-off) + state transitions          */
+/* ------------------------------------------------------------------ */
+@keyframes tear-in {
+  from { clip-path: inset(0 100% 0 0); opacity: 0.4; }
+  to { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+@keyframes stamp-in {
+  0% { transform: rotate(-2deg) scale(1.6); opacity: 0; }
+  60% { transform: rotate(-2deg) scale(0.95); opacity: 1; }
+  100% { transform: rotate(-2deg) scale(1); opacity: 1; }
+}
+@keyframes rise {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+
+.anim-tear { animation: tear-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-stamp { animation: stamp-in 380ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-rise { animation: rise 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-backdrop { animation: backdrop-in 200ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
