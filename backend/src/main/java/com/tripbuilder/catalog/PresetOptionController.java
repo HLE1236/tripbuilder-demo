@@ -13,9 +13,26 @@ public class PresetOptionController {
 
     private final PresetOptionRepository optionRepository;
 
-    public record OptionDto(Long id, Long regionId, String category, String title, long pricePerPerson) {
+    public record OptionDto(
+            Long id,
+            Long regionId,
+            String category,
+            String title,
+            String imageUrl,
+            long pricePerPerson
+    ) {
         public static OptionDto from(PresetOption o) {
-            return new OptionDto(o.getId(), o.getRegion().getId(), o.getCategory(), o.getTitle(), o.getPricePerPerson());
+            String img = (o.getImageUrl() != null && !o.getImageUrl().isBlank())
+                    ? o.getImageUrl()
+                    : o.getRegion().getImageUrl();
+            return new OptionDto(
+                    o.getId(),
+                    o.getRegion().getId(),
+                    o.getCategory(),
+                    o.getTitle(),
+                    img,
+                    o.getPricePerPerson()
+            );
         }
     }
 

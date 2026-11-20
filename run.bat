@@ -1,38 +1,42 @@
 @echo off
-REM Chay Backend (:8080) va Web App (:5173 - tich hop nut gat chuyen vai Khach hang <-> Tour Guide).
-REM   run.bat       -> dung SQL Server (neu dang tat tu chuyen sang H2 luu file)
-REM   run.bat h2    -> dung H2 luu file (khong can cai database)
+title TripBuilder Launcher
+echo ====================================================
+echo   TripBuilder — He thong dat tour theo yeu cau
+echo   - Backend API : http://localhost:8080
+echo   - Cong Khach  : http://localhost:5173
+echo   - Cong Guide  : http://localhost:5174
+echo ====================================================
+echo.
 
-cd /d %~dp0
-
-set PROFILE_ARG=
-if /i "%1"=="h2" goto use_h2
-
-sc query MSSQL$SQLEXPRESS | find "RUNNING" >nul
-if errorlevel 1 (
-  echo SQL Server dang tat, dang thu bat len...
-  net start MSSQL$SQLEXPRESS >nul 2>&1
+if not exist "%~dp0web-client\node_modules" (
+    echo [1/4] Cai dat dependencies cho web-client...
+    pushd "%~dp0web-client"
+    call npm install
+    popd
 )
-sc query MSSQL$SQLEXPRESS | find "RUNNING" >nul
-if errorlevel 1 (
-  echo [!] Khong bat duoc SQL Server. Tu dong chuyen sang H2 luu file.
-  goto use_h2
+
+if not exist "%~dp0web-admin\node_modules" (
+    echo [2/4] Cai dat dependencies cho web-admin...
+    pushd "%~dp0web-admin"
+    call npm install
+    popd
 )
-echo SQL Server dang chay.
-goto start_all
 
-:use_h2
-set PROFILE_ARG=-Dspring-boot.run.profiles=h2
-echo Backend se dung H2 luu file (backend\data\tripbuilder.mv.db).
+echo [3/4] Khoi dong Backend (:8080), Client (:5173) va Guide Studio (:5174)...
+start "TripBuilder Backend (8080)" cmd /k "cd /d "%~dp0backend" && mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=h2"
+timeout /t 4 /nobreak > nul
 
-:start_all
-if not exist web-client\node_modules (cd web-client && call npm install && cd ..)
+start "TripBuilder Client (5173)" cmd /k "cd /d "%~dp0web-client" && npm run dev"
+start "TripBuilder Admin (5174)" cmd /k "cd /d "%~dp0web-admin" && npm run dev"
 
-start "Backend :8080" cmd /k "cd /d %~dp0backend && mvnw.cmd spring-boot:run %PROFILE_ARG%"
-start "TripBuilder Web :5173" cmd /k "cd /d %~dp0web-client && npm run dev"
+echo [4/4] Dang mo 2 cong trinh duyet sau vai giay...
+timeout /t 5 /nobreak > nul
+start "" http://localhost:5173
+start "" http://localhost:5174
 
 echo.
-echo Da mo Backend (:8080) va Giao dien Web (:5173).
-echo Doi Backend bao "Started BackendApplication" roi truy cap:
-echo   👉 http://localhost:5173  (Co nut gat chuyen vai [Khach hang] va [Tour Guide] ngay tren Header)
-pause
+echo Hoan tat! Tai khoan mau co mat khau chung: 123456
+echo   Khach : an.nguyen@gmail.com
+echo   Guide : binh.guide@tripbuilder.vn
+echo Nhan phim bat ky de dong cua so launcher nay (3 service van chay).
+pause > nul

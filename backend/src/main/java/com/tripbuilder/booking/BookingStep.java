@@ -3,17 +3,6 @@ package com.tripbuilder.booking;
 import jakarta.persistence.*;
 import lombok.*;
 
-/**
- * Một dòng hoạt động trong đơn đặt tour của khách.
- * Lưu cả tên gốc (originalTitle) và giá gốc (originalPricePerPerson) để đối chiếu Trước & Sau.
- *
- * noteType:
- * - "PRESET"   : Giữ nguyên từ Tour gốc
- * - "MODIFIED" : Khách đã đổi sang lựa chọn khác (Swap)
- * - "REMOVED"  : Khách đã bấm Bỏ mục này (giá hiện tại = 0đ, gạch ngang, giữ lại vết cho Guide thấy)
- * - "CUSTOM"   : Khách yêu cầu thêm mới
- * - "GUIDE"    : Guide đã báo giá / điều chỉnh
- */
 @Entity
 @Table(name = "booking_steps")
 @Getter
@@ -39,14 +28,15 @@ public class BookingStep {
     @Column(nullable = false, length = 300)
     private String title;
 
+    @Column(length = 500)
+    private String imageUrl;
+
     @Column(nullable = false)
     private Long pricePerPerson;
 
-    /** Tên hạng mục gốc trước khi đổi (nếu có) để hiển thị "Đã đổi từ X -> Y". */
     @Column(length = 300)
     private String originalTitle;
 
-    /** Đơn giá gốc trước khi đổi/bỏ/báo giá lại để hiển thị giá cũ gạch ngang. */
     private Long originalPricePerPerson;
 
     @Column(length = 20)

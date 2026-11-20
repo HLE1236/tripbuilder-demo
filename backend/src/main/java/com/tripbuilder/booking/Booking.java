@@ -12,7 +12,8 @@ import java.util.List;
 
 /**
  * Đơn đặt tour của khách hàng.
- * Lưu cả Giá gốc ban đầu (để đối chiếu) và Giá sau khi chỉnh sửa / Guide báo giá lại.
+ * Lưu snapshot lịch trình & giá tại thời điểm đặt, hỗ trợ đàm phán nhiều vòng
+ * và điều chỉnh sau khi đã chốt mà không bị ảnh hưởng khi Guide sửa Tour Preset gốc.
  */
 @Entity
 @Table(name = "bookings")
@@ -33,6 +34,12 @@ public class Booking {
     @ManyToOne(optional = false)
     private Tour tour;
 
+    /** Snapshot tên & version tour lúc khách đặt (tránh bị trôi khi Guide sửa tour gốc). */
+    @Column(length = 200)
+    private String tourTitleSnapshot;
+
+    private Integer tourVersionSnapshot;
+
     @ManyToOne(optional = false)
     private AppUser customer;
 
@@ -42,39 +49,49 @@ public class Booking {
     @Column(nullable = false)
     private LocalDate startDate;
 
-    /** Số ngày đi thực tế khách muốn (mặc định bằng số ngày của tour, khách có thể tăng/giảm). */
     @Column(name = "num_days", nullable = false)
     private Integer days;
 
-    /** Số lượng khách đi (tính chung đơn giản: Đơn giá/người × guests). */
     @Column(nullable = false)
     private Integer guests;
 
-    /** Ghi chú yêu cầu riêng của khách. */
     @Column(length = 1000)
     private String customerNote;
 
-    /** Lời nhắn phản hồi của Tour Guide khi báo giá lại. */
+    @Column(length = 30)
+    private String serviceMode;
+
     @Column(length = 1000)
     private String guideNote;
 
-    /** Giá gốc / 1 người của Tour Preset lúc đặt. */
+    private Integer customerRating;
+
+    @Column(length = 1000)
+    private String customerReview;
+
     @Column(nullable = false)
     private Long originalPricePerPerson;
 
-    /** Đơn giá / 1 người hiện tại (tổng các dòng hoạt động trong đơn). */
     @Column(nullable = false)
     private Long currentPricePerPerson;
 
-    /** Phụ thu (+) hoặc giảm giá (-) cho cả đoàn do Guide nhập khi báo giá lại. */
     @Column(nullable = false)
     private Long groupAdjustment;
 
-    /** Tổng thanh toán cuối cùng = (currentPricePerPerson × guests) + groupAdjustment. */
     @Column(nullable = false)
     private Long totalPrice;
 
+    /** Lưu tổng giá lần chốt gần nhất để đối chiếu khi có điều chỉnh sau chốt. */
+    private Long confirmedTotalPrice;
+
+    /** Số vòng trao đổi/điều chỉnh. */
+    private Integer revisionCount;
+
+    /** Đánh dấu đơn đang ở luồng điều chỉnh sau khi đã chốt. */
+    private Boolean postConfirmAdjustment;
+
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)
     private BookingStatus status;
 
@@ -85,4 +102,9 @@ public class Booking {
     @OrderBy("dayNumber ASC, sortOrder ASC, id ASC")
     @Builder.Default
     private List<BookingStep> steps = new ArrayList<>();
+
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("roundNo DESC, id DESC")
+    @Builder.Default
+    private List<BookingRevision> revisions = new ArrayList<>();
 }

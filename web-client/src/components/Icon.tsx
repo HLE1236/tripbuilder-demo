@@ -1,233 +1,448 @@
 import type { SVGProps } from 'react';
 
-/**
- * Bộ icon nét (stroke 1.75, 24×24) dùng thống nhất cho toàn app.
- * Thay cho emoji để giữ một hệ biểu tượng đồng nhất.
- */
 export type IconName =
-  | 'user'
-  | 'compass'
-  | 'bus'
-  | 'bed'
+  | 'transport'
+  | 'hotel'
+  | 'food'
+  | 'activity'
+  | 'custom'
   | 'ticket'
-  | 'utensils'
-  | 'sparkle'
-  | 'swap'
-  | 'x'
-  | 'undo'
-  | 'plus'
-  | 'minus'
+  | 'compass'
   | 'calendar'
   | 'users'
+  | 'user'
+  | 'map-pin'
   | 'clock'
-  | 'pin'
   | 'check'
-  | 'arrow-left'
-  | 'arrow-right'
-  | 'refresh'
+  | 'check-circle'
+  | 'x'
+  | 'plus'
+  | 'minus'
+  | 'edit'
+  | 'swap'
+  | 'void'
+  | 'restore'
+  | 'star'
   | 'sun'
   | 'moon'
-  | 'send'
-  | 'gift'
-  | 'pencil'
-  | 'message'
+  | 'search'
+  | 'logout'
+  | 'phone'
+  | 'arrow-right'
+  | 'arrow-left'
+  | 'external'
+  | 'shield-check'
+  | 'tag'
   | 'alert'
-  | 'globe'
-  | 'wallet'
-  | 'cake'
-  | 'flame'
-  | 'camera'
-  | 'leaf';
+  | 'image'
+  | 'chevron-down'
+  | 'chevron-right'
+  | 'chevron-left'
+  | 'dashboard'
+  | 'clipboard'
+  | 'map'
+  | 'heart'
+  | 'bookmark'
+  | 'zoom-in'
+  | 'grid'
+  | 'refresh'
+  | 'sliders'
+  | 'arrow-up-down'
+  | 'camera';
 
-const PATHS: Record<IconName, React.ReactNode> = {
-  user: (
-    <>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
-    </>
-  ),
-  compass: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m15.5 8.5-2 5-5 2 2-5z" />
-    </>
-  ),
-  bus: (
-    <>
-      <rect x="4" y="3" width="16" height="14" rx="2" />
-      <path d="M4 11h16M8 21v-4M16 21v-4" />
-      <circle cx="8" cy="14" r="0.6" />
-      <circle cx="16" cy="14" r="0.6" />
-    </>
-  ),
-  bed: (
-    <>
-      <path d="M3 18V6M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5" />
-      <circle cx="7" cy="11" r="2" />
-    </>
-  ),
-  ticket: (
-    <>
-      <path d="M3 8a2 2 0 0 0 0 4v4a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-4a2 2 0 0 1 0-4V5a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z" transform="translate(0 1.5)" />
-      <path d="M14 6v2M14 11v2M14 16v1" />
-    </>
-  ),
-  utensils: (
-    <>
-      <path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10" />
-      <path d="M17 21V3c-2 1-3 4-3 7h3" />
-    </>
-  ),
-  sparkle: (
-    <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z" />
-  ),
-  swap: (
-    <>
-      <path d="M7 4 3 8l4 4M3 8h13" />
-      <path d="m17 20 4-4-4-4M21 16H8" />
-    </>
-  ),
-  x: <path d="M6 6l12 12M18 6 6 18" />,
-  undo: (
-    <>
-      <path d="M9 14 4 9l5-5" />
-      <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
-    </>
-  ),
-  plus: <path d="M12 5v14M5 12h14" />,
-  minus: <path d="M5 12h14" />,
-  calendar: (
-    <>
-      <rect x="3" y="5" width="18" height="16" rx="2" />
-      <path d="M3 10h18M8 3v4M16 3v4" />
-    </>
-  ),
-  users: (
-    <>
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
-      <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.5 2.8 3.5 6" />
-    </>
-  ),
-  clock: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </>
-  ),
-  pin: (
-    <>
-      <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" />
-      <circle cx="12" cy="9.5" r="2.5" />
-    </>
-  ),
-  check: <path d="m5 12.5 4.5 4.5L19 7" />,
-  'arrow-left': <path d="M19 12H5M11 6l-6 6 6 6" />,
-  'arrow-right': <path d="M5 12h14M13 6l6 6-6 6" />,
-  refresh: (
-    <>
-      <path d="M20 11a8 8 0 0 0-14.3-4.9L4 8" />
-      <path d="M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16" />
-      <path d="M20 20v-4h-4" />
-    </>
-  ),
-  sun: (
-    <>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-    </>
-  ),
-  moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />,
-  send: (
-    <>
-      <path d="M21 3 10 14" />
-      <path d="m21 3-7 18-4-7-7-4z" />
-    </>
-  ),
-  gift: (
-    <>
-      <rect x="3" y="8" width="18" height="5" rx="1" />
-      <path d="M5 13v8h14v-8M12 8v13" />
-      <path d="M12 8C10 4 6.5 4.5 7 7c.3 1.2 2.5 1 5 1zM12 8c2-4 5.5-3.5 5-1-.3 1.2-2.5 1-5 1z" />
-    </>
-  ),
-  pencil: (
-    <>
-      <path d="M4 20h4L19 9l-4-4L4 16z" />
-      <path d="m14 6 4 4" />
-    </>
-  ),
-  message: <path d="M4 5h16v11H9l-5 4z" />,
-  alert: (
-    <>
-      <path d="M12 3 2 20h20z" />
-      <path d="M12 10v4M12 17v.5" />
-    </>
-  ),
-  globe: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
-    </>
-  ),
-  wallet: (
-    <>
-      <path d="M4 7h15a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
-      <path d="M4 7l11-3v3M16 13.5h1.5" />
-    </>
-  ),
-  cake: (
-    <>
-      <path d="M4 21v-7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7zM4 16c2 1.5 4 1.5 5.3 0 1.4 1.5 4 1.5 5.4 0 1.3 1.5 3.3 1.5 5.3 0" />
-      <path d="M12 12V8M12 5.5V5" />
-    </>
-  ),
-  flame: <path d="M12 21c-4 0-6.5-2.7-6.5-6.2 0-3.6 3-5.5 3.5-9.3 2.5 1.6 4 4 4 6.5 1-.5 1.8-1.6 2-3 1.8 1.6 3.5 3.8 3.5 6.3 0 3.4-2.5 5.7-6.5 5.7z" />,
-  camera: (
-    <>
-      <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
-      <circle cx="12" cy="13" r="3.5" />
-    </>
-  ),
-  leaf: (
-    <>
-      <path d="M5 19C5 10 10 5 20 4c0 10-5 15-14 15z" />
-      <path d="M5 19 13 11" />
-    </>
-  ),
-};
+export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
+  name: IconName;
+  size?: number;
+  strokeWidth?: number;
+  filled?: boolean;
+  className?: string;
+}
 
-export default function Icon({
+export function categoryIconName(category: string): IconName {
+  switch (category) {
+    case 'Di chuyển':
+      return 'transport';
+    case 'Khách sạn':
+      return 'hotel';
+    case 'Ăn uống':
+      return 'food';
+    case 'Trải nghiệm':
+      return 'activity';
+    case 'Yêu cầu thêm':
+      return 'custom';
+    default:
+      return 'tag';
+  }
+}
+
+export function Icon({
   name,
   size = 16,
-  className,
+  strokeWidth = 1.75,
+  filled = false,
+  className = '',
+  'aria-hidden': ariaHidden = true,
   ...rest
-}: { name: IconName; size?: number } & Omit<SVGProps<SVGSVGElement>, 'name'>) {
+}: IconProps) {
+  const fill = filled ? 'currentColor' : 'none';
+
   return (
     <svg
+      xmlns="http://www.w3.org/2000/svg"
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={fill}
       stroke="currentColor"
-      strokeWidth={1.75}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden="true"
-      className={`shrink-0 ${className ?? ''}`}
+      className={`inline-block shrink-0 ${className}`.trim()}
+      aria-hidden={ariaHidden}
       {...rest}
     >
-      {PATHS[name]}
+      {renderPaths(name)}
     </svg>
   );
 }
 
-/** Icon theo danh mục dịch vụ của một dòng lịch trình. */
-export function categoryIconName(category: string): IconName {
-  const c = category.toLowerCase();
-  if (c.includes('di chuyển') || c.includes('xe')) return 'bus';
-  if (c.includes('khách sạn') || c.includes('lưu trú') || c.includes('resort')) return 'bed';
-  if (c.includes('ăn') || c.includes('ẩm thực')) return 'utensils';
-  if (c.includes('yêu cầu')) return 'sparkle';
-  return 'ticket';
+function renderPaths(name: IconName) {
+  switch (name) {
+    case 'transport':
+      return (
+        <>
+          <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
+          <path d="M4 11h16v6a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H7v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6Z" />
+          <circle cx="7.5" cy="14" r="0.8" fill="currentColor" />
+          <circle cx="16.5" cy="14" r="0.8" fill="currentColor" />
+        </>
+      );
+    case 'hotel':
+      return (
+        <>
+          <path d="M3 18v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8" />
+          <path d="M3 14h18" />
+          <path d="M7 10V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2" />
+          <path d="M3 18v2" />
+          <path d="M21 18v2" />
+        </>
+      );
+    case 'food':
+      return (
+        <>
+          <path d="M4 3v7a3 3 0 0 0 6 0V3" />
+          <path d="M7 3v18" />
+          <path d="M15 3v18" />
+          <path d="M15 3c2.5 0 4 2.2 4 5.5S17.5 14 15 14" />
+        </>
+      );
+    case 'activity':
+      return (
+        <>
+          <path d="M3 19l6-10 4 6 3-4 5 8H3Z" />
+          <circle cx="17.5" cy="6.5" r="2" />
+        </>
+      );
+    case 'custom':
+      return (
+        <>
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </>
+      );
+    case 'ticket':
+      return (
+        <>
+          <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7Z" />
+          <path d="M13 5v2" />
+          <path d="M13 11v2" />
+          <path d="M13 17v2" />
+        </>
+      );
+    case 'compass':
+      return (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <polygon points="15.5 8.5 13.5 13.5 8.5 15.5 10.5 10.5 15.5 8.5" />
+        </>
+      );
+    case 'calendar':
+      return (
+        <>
+          <rect x="3" y="4" width="18" height="17" rx="2" />
+          <path d="M8 2v4" />
+          <path d="M16 2v4" />
+          <path d="M3 10h18" />
+        </>
+      );
+    case 'users':
+      return (
+        <>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="3.5" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a3.5 3.5 0 0 1 0 6.74" />
+        </>
+      );
+    case 'user':
+      return (
+        <>
+          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </>
+      );
+    case 'map-pin':
+      return (
+        <>
+          <path d="M12 21s-6-5.33-6-10a6 6 0 1 1 12 0c0 4.67-6 10-6 10Z" />
+          <circle cx="12" cy="11" r="2.2" />
+        </>
+      );
+    case 'clock':
+      return (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </>
+      );
+    case 'check':
+      return <path d="M5 13l4 4L19 7" />;
+    case 'check-circle':
+      return (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8.5 12.5l2.5 2.5 4.5-5" />
+        </>
+      );
+    case 'x':
+      return (
+        <>
+          <path d="M18 6L6 18" />
+          <path d="M6 6l12 12" />
+        </>
+      );
+    case 'plus':
+      return (
+        <>
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </>
+      );
+    case 'minus':
+      return <path d="M5 12h14" />;
+    case 'edit':
+      return (
+        <>
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+        </>
+      );
+    case 'swap':
+      return (
+        <>
+          <path d="M16 3l4 4-4 4" />
+          <path d="M20 7H4" />
+          <path d="M8 21l-4-4 4-4" />
+          <path d="M4 17h16" />
+        </>
+      );
+    case 'void':
+      return (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M5.6 5.6l12.8 12.8" />
+        </>
+      );
+    case 'restore':
+      return (
+        <>
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+          <path d="M3 3v5h5" />
+        </>
+      );
+    case 'star':
+      return (
+        <polygon points="12 2.5 14.9 8.4 21.4 9.3 16.7 13.9 17.8 20.4 12 17.3 6.2 20.4 7.3 13.9 2.6 9.3 9.1 8.4 12 2.5" />
+      );
+    case 'sun':
+      return (
+        <>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="M4.93 4.93l1.41 1.41" />
+          <path d="M17.66 17.66l1.41 1.41" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="M4.93 19.07l1.41-1.41" />
+          <path d="M17.66 6.34l1.41-1.41" />
+        </>
+      );
+    case 'moon':
+      return <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z" />;
+    case 'search':
+      return (
+        <>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </>
+      );
+    case 'logout':
+      return (
+        <>
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <path d="M16 17l5-5-5-5" />
+          <path d="M21 12H9" />
+        </>
+      );
+    case 'phone':
+      return (
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.58 2.81.7A2 2 0 0 1 22 16.92Z" />
+      );
+    case 'arrow-right':
+      return (
+        <>
+          <path d="M5 12h14" />
+          <path d="M13 6l6 6-6 6" />
+        </>
+      );
+    case 'arrow-left':
+      return (
+        <>
+          <path d="M19 12H5" />
+          <path d="M11 6l-6 6 6 6" />
+        </>
+      );
+    case 'external':
+      return (
+        <>
+          <path d="M15 3h6v6" />
+          <path d="M10 14L21 3" />
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        </>
+      );
+    case 'shield-check':
+      return (
+        <>
+          <path d="M12 2l7 3v6c0 5-3.5 9-7 11-3.5-2-7-6-7-11V5l7-3Z" />
+          <path d="M9 12l2 2 4-4" />
+        </>
+      );
+    case 'tag':
+      return (
+        <>
+          <path d="M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.42l9 9a2 2 0 0 0 2.82 0l7.17-7.17a2 2 0 0 0 0-2.82l-9-9Z" />
+          <circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" />
+        </>
+      );
+    case 'alert':
+      return (
+        <>
+          <path d="M12 3L2 20h20L12 3Z" />
+          <path d="M12 10v4" />
+          <circle cx="12" cy="17" r="0.7" fill="currentColor" />
+        </>
+      );
+    case 'image':
+      return (
+        <>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="8.5" cy="9.5" r="1.5" />
+          <path d="M21 16l-5-5-8 8" />
+        </>
+      );
+    case 'chevron-down':
+      return <path d="M6 9l6 6 6-6" />;
+    case 'chevron-right':
+      return <path d="M9 6l6 6-6 6" />;
+    case 'chevron-left':
+      return <path d="M15 6l-6 6 6 6" />;
+    case 'dashboard':
+      return (
+        <>
+          <rect x="3" y="3" width="7" height="9" rx="1" />
+          <rect x="14" y="3" width="7" height="5" rx="1" />
+          <rect x="14" y="12" width="7" height="9" rx="1" />
+          <rect x="3" y="16" width="7" height="5" rx="1" />
+        </>
+      );
+    case 'clipboard':
+      return (
+        <>
+          <rect x="8" y="2" width="8" height="4" rx="1" />
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+          <path d="M9 12h6" />
+          <path d="M9 16h4" />
+        </>
+      );
+    case 'map':
+      return (
+        <>
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6" />
+          <path d="M9 3v15" />
+          <path d="M15 6v15" />
+        </>
+      );
+    case 'heart':
+      return (
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z" />
+      );
+    case 'bookmark':
+      return <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16Z" />;
+    case 'zoom-in':
+      return (
+        <>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.35-4.35" />
+          <path d="M11 8v6" />
+          <path d="M8 11h6" />
+        </>
+      );
+    case 'grid':
+      return (
+        <>
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </>
+      );
+    case 'refresh':
+      return (
+        <>
+          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+          <path d="M16 16h5v5" />
+        </>
+      );
+    case 'sliders':
+      return (
+        <>
+          <path d="M4 21v-7" />
+          <path d="M4 10V3" />
+          <path d="M12 21v-9" />
+          <path d="M12 8V3" />
+          <path d="M20 21v-5" />
+          <path d="M20 12V3" />
+          <path d="M1 14h6" />
+          <path d="M9 8h6" />
+          <path d="M17 16h6" />
+        </>
+      );
+    case 'arrow-up-down':
+      return (
+        <>
+          <path d="M7 15l5 5 5-5" />
+          <path d="M7 9l5-5 5 5" />
+        </>
+      );
+    case 'camera':
+      return (
+        <>
+          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
+          <circle cx="12" cy="13" r="3.5" />
+        </>
+      );
+  }
 }

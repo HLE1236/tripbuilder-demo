@@ -1,0 +1,782 @@
+[
+  {
+    "path": "/images/activities/01-limousine-van.jpg",
+    "regionCode": "shared",
+    "landmarkName": "Xe Limousine / Xe du lịch",
+    "caption": "Xe du lịch đời mới đưa đón tận nơi trên các cung đường Việt Nam",
+    "category": "Di chuyển",
+    "credit": "EurovisionNim",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:2006-2012_Ford_Transit_(VM)_LX_van_(2015-12-23)_02.jpg"
+  },
+  {
+    "path": "/images/activities/02-bbq-party.jpg",
+    "regionCode": "shared",
+    "landmarkName": "Tiệc BBQ nướng",
+    "caption": "Bữa tiệc nướng BBQ thơm lừng hấp dẫn",
+    "category": "Ẩm thực",
+    "credit": "HSeqao MLSGA",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:SZ_%E6%B7%B1%E5%9C%B3_Shenzhen_%E9%BE%8D%E5%B4%97_Longgang_%E9%BE%8D%E5%B4%97%E5%A4%A7%E9%81%93_Blvd_Road_%E5%A4%A9%E8%99%B9%E5%95%86%E5%A0%B4_Rainbow_Shopping_mall_shop_%E5%B7%9D%E5%91%B5%E5%91%B5%E8%87%AA%E5%8A%A9%E7%83%A4%E8%82%89_Chuan_HeHe_BBQ_meat_Buffet_Restaurant_seafood_%E9%AE%AE%E6%89%87%E8%B2%9D%E8%82%89_shell_scallops_October_2025_N13P_04.jpg"
+  },
+  {
+    "path": "/images/activities/03-seafood-feast.jpg",
+    "regionCode": "shared",
+    "landmarkName": "Hải sản tươi sống",
+    "caption": "Thưởng thức hải sản tươi ngon đánh bắt trong ngày",
+    "category": "Ẩm thực",
+    "credit": "Phương Huy (thảo luận)",
+    "license": "Public domain",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:T%C3%B4m_n%C6%B0%E1%BB%9Bng_Phan_X%C3%ADch_Long,_n%C4%83m_2017_(1).jpg"
+  },
+  {
+    "path": "/images/activities/04-vietnamese-cuisine.jpg",
+    "regionCode": "shared",
+    "landmarkName": "Ẩm thực Việt Nam",
+    "caption": "Mâm cơm và các món ngon truyền thống Việt Nam",
+    "category": "Ẩm thực",
+    "credit": "Guilhem Vellut from Paris, France",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bun_tron,_Pho_Tai,_Paris_30_October_2016_001.jpg"
+  },
+  {
+    "path": "/images/activities/05-resort-spa.jpg",
+    "regionCode": "shared",
+    "landmarkName": "Khu nghỉ dưỡng & Spa",
+    "caption": "Không gian hồ bơi và spa thư giãn tại khu nghỉ dưỡng Việt Nam",
+    "category": "Lưu trú",
+    "credit": "Dennis G. Jarvis",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:DGJ_0721_-_Pool_at_the_Resort,_Da_Nang,_Viet_Nam_(3382626443).jpg"
+  },
+  {
+    "path": "/images/activities/06-vietnamese-coffee-breakfast.jpg",
+    "regionCode": "shared",
+    "landmarkName": "Cà phê & Bữa sáng Việt",
+    "caption": "Bữa sáng nhẹ nhàng cùng ly cà phê Việt đậm đà hương vị",
+    "category": "Ẩm thực",
+    "credit": "Amenoc",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Egg_coffee_at_Caf%C3%A9_Giang_closeup.jpg"
+  },
+  {
+    "path": "/images/avatars/01-guide-minh.jpg",
+    "regionCode": "avatar",
+    "landmarkName": "Hướng dẫn viên Minh Hoàng",
+    "caption": "Hướng dẫn viên bản địa chuyên tuyến miền Bắc",
+    "category": "Avatar",
+    "credit": "Sebastian Oliva",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Seth_Montfort_smile_straight.jpg"
+  },
+  {
+    "path": "/images/avatars/02-guide-lan.jpg",
+    "regionCode": "avatar",
+    "landmarkName": "Hướng dẫn viên Lan Anh",
+    "caption": "Hướng dẫn viên văn hóa di sản miền Trung",
+    "category": "Avatar",
+    "credit": "McKissackNYC",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:C.McKissack_1.jpg"
+  },
+  {
+    "path": "/images/avatars/03-guide-tuan.jpg",
+    "regionCode": "avatar",
+    "landmarkName": "Hướng dẫn viên Tuấn Kiệt",
+    "caption": "Hướng dẫn viên chuyên tuyến biển đảo Phú Quốc",
+    "category": "Avatar",
+    "credit": "אפרת בלוססקי Ephrat Beloosesky",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jonathan_Bar_Giora_2020.jpg"
+  },
+  {
+    "path": "/images/avatars/04-traveler-linh.jpg",
+    "regionCode": "avatar",
+    "landmarkName": "Khách hàng Khánh Linh",
+    "caption": "Thành viên yêu thích du lịch sinh thái",
+    "category": "Avatar",
+    "credit": "User:Rzathewu",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Young_Summer_close_crop_Fall_of_2020.jpg"
+  },
+  {
+    "path": "/images/avatars/05-traveler-hung.jpg",
+    "regionCode": "avatar",
+    "landmarkName": "Khách hàng Quốc Hùng",
+    "caption": "Nhiếp ảnh gia du lịch khám phá",
+    "category": "Avatar",
+    "credit": "Magdalena Roeseler",
+    "license": "CC BY 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:500px_photo_(158611581).jpeg"
+  },
+  {
+    "path": "/images/avatars/06-traveler-mai.jpg",
+    "regionCode": "avatar",
+    "landmarkName": "Khách hàng Ngọc Mai",
+    "caption": "Du khách đam mê ẩm thực địa phương",
+    "category": "Avatar",
+    "credit": "Mark Morin, mark@markmorinii.com",
+    "license": "CC BY 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Headshot_of_Andrea_Abrams.jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/01-cau-dat-tea-hill.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Đồi chè Cầu Đất",
+    "caption": "Những luống chè xanh mướt trải dài trên đồi cao Đà Lạt",
+    "category": "Toàn cảnh",
+    "credit": "ℍmoong",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:%C4%90%E1%BB%93i_ch%C3%A8_C%E1%BA%A7u_%C4%90%E1%BA%A5t,_th%C3%A1ng_11_n%C4%83m_2011_-_1.jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/02-tuyen-lam-lake.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Hồ Tuyền Lâm",
+    "caption": "Mặt hồ Tuyền Lâm tĩnh lặng soi bóng rừng thông Đà Lạt",
+    "category": "Toàn cảnh",
+    "credit": "Thai Ho from Ho Chi MInh, Viet Nam",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Tuy%E1%BB%81n_L%C3%A2m_Lake_(16373058330).jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/03-xuan-huong-lake.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Hồ Xuân Hương",
+    "caption": "Hồ Xuân Hương thơ mộng ngay giữa trái tim thành phố Đà Lạt",
+    "category": "Toàn cảnh",
+    "credit": "P. Hughes",
+    "license": "CC BY 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Da_Lat_-_Xuan_Huong_Lake.jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/04-datanla-waterfall.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Thác Datanla",
+    "caption": "Thác Datanla tung bọt trắng xóa giữa rừng thông cao nguyên",
+    "category": "Trải nghiệm",
+    "credit": "Damian Vo",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Datanla_falls_(August_8,_2018)_(43968936702).jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/05-dalat-railway-station.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Ga Đà Lạt",
+    "caption": "Nhà ga xe lửa cổ kính với kiến trúc Art Deco đặc trưng của Đà Lạt",
+    "category": "Toàn cảnh",
+    "credit": "Lars Curfs (Grashoofd)",
+    "license": "CC BY-SA 3.0 nl",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Da_Lat_Railway_Station-1.JPG"
+  },
+  {
+    "path": "/images/tours/da-lat/06-valley-of-love.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Đồi hoa Đà Lạt",
+    "caption": "Vườn hoa rực rỡ sắc màu đặc trưng xứ sở ngàn hoa Đà Lạt",
+    "category": "Trải nghiệm",
+    "credit": "nerdcoregirl",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Da_Lat_Flower_Park_2.jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/07-dalat-night-market.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Chợ đêm Đà Lạt",
+    "caption": "Không khí nhộn nhịp về đêm tại khu vực chợ Đà Lạt",
+    "category": "Trải nghiệm",
+    "credit": "Roy Kim",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Dalat_market,_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/08-french-villa-dalat.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Biệt thự Pháp cổ Đà Lạt",
+    "caption": "Kiến trúc biệt thự Pháp cổ kính ẩn mình dưới tán thông Đà Lạt",
+    "category": "Lưu trú",
+    "credit": "hiyori13",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bao_Dai%27s_Summer_Palace_-_Garden.jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/09-pine-hill-homestay.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Homestay đồi thông Đà Lạt",
+    "caption": "Không gian nghỉ dưỡng giữa rừng thông và đồi núi Đà Lạt",
+    "category": "Lưu trú",
+    "credit": "Liftold at Vietnamese Wikipedia",
+    "license": "CC BY 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Doi_mong_mo_-_da_lat.JPG"
+  },
+  {
+    "path": "/images/tours/da-lat/10-dalat-coffee.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Cà phê cao nguyên Đà Lạt",
+    "caption": "Cà phê phin đậm đà vùng cao nguyên Lâm Đồng",
+    "category": "Ẩm thực",
+    "credit": "Frank Fox",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Vietnamese_Coffee_in_Da_Lat.jpg"
+  },
+  {
+    "path": "/images/tours/da-lat/11-dalat-bbq-hotpot.jpg",
+    "regionCode": "da-lat",
+    "landmarkName": "Bánh tráng nướng & BBQ Đà Lạt",
+    "caption": "Món nướng phố núi thơm lừng trong không khí se lạnh Đà Lạt",
+    "category": "Ẩm thực",
+    "credit": "Blueconcorde",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Banh_trang_nuong_dalat.jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/01-bay-panorama.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Vịnh Hạ Long",
+    "caption": "Toàn cảnh Vịnh Hạ Long với hàng nghìn đảo đá vôi kỳ vĩ",
+    "category": "Toàn cảnh",
+    "credit": "Richard Mortel from Riyadh, Saudi Arabia",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ha_Long_Bay,_northern_Vietnam_(172)_(37828780074).jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/02-titop-island.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Đảo Ti Tốp",
+    "caption": "Bãi biển và góc nhìn toàn cảnh từ đỉnh Đảo Ti Tốp, Vịnh Hạ Long",
+    "category": "Toàn cảnh",
+    "credit": "thalling55",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Titop_Island.jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/03-trong-mai-islet.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Hòn Trống Mái",
+    "caption": "Biểu tượng Hòn Trống Mái (Hòn Gà Chọi) trên Vịnh Hạ Long",
+    "category": "Toàn cảnh",
+    "credit": "Hungda",
+    "license": "CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ha_Long_bay_The_Kissing_Rocks.jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/04-cruise-bay.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Du thuyền Vịnh Hạ Long",
+    "caption": "Du thuyền truyền thống trên làn nước xanh ngọc Vịnh Hạ Long",
+    "category": "Trải nghiệm",
+    "credit": "lumoplank",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ha_Long_Bay_-_Halong1407.jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/05-kayak-luon-cave.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Kayak Hang Luồn",
+    "caption": "Chèo thuyền kayak khám phá Hang Luồn và vách đá vôi Hạ Long",
+    "category": "Trải nghiệm",
+    "credit": "Mig Gilbert from Brighton",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lu%E1%BB%93n_Cave_(26423228188).jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/06-sung-sot-cave.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Hang Sửng Sốt",
+    "caption": "Kỳ quan nhũ đá lung linh bên trong Hang Sửng Sốt, Hạ Long",
+    "category": "Trải nghiệm",
+    "credit": "Jakub Hałun",
+    "license": "CC BY 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sung_Sot_Cave,_Ha_Long_Bay,_Vietnam,_20240128_1556_3854.jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/07-cua-van-village.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Làng chài Cửa Vạn",
+    "caption": "Làng chài nổi bình yên trên Vịnh Hạ Long",
+    "category": "Trải nghiệm",
+    "credit": "David Stanley",
+    "license": "CC BY 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cua_Van_Floating_Village.jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/08-bai-chay-cable-car.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Cáp treo Nữ Hoàng & Bãi Cháy",
+    "caption": "Cầu Bãi Cháy và khu vực cáp treo nhìn ra vịnh Hạ Long",
+    "category": "Di chuyển",
+    "credit": "Martin Lewison from Forest Hills, NY, U.S.A.",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:B%C3%A3i_Ch%C3%A1y_Bridge_from_Ha_Long_Queen_Cable_Car_(49373501376).jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/09-bay-view-hotel.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Khách sạn hướng vịnh Hạ Long",
+    "caption": "Khách sạn và khu nghỉ dưỡng hiện đại hướng vịnh Hạ Long",
+    "category": "Lưu trú",
+    "credit": "Buileducanh (thảo luận)",
+    "license": "CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cang_tau_khach_du_lich_Bai_Chay.jpg"
+  },
+  {
+    "path": "/images/tours/ha-long/10-ha-long-seafood.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Hải sản Hạ Long",
+    "caption": "Hải sản tươi sống đặc trưng vùng biển Quảng Ninh",
+    "category": "Ẩm thực",
+    "credit": "Daderot",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Seafood_in_Han_Market_-_Da_Nang,_Vietnam_-_DSC02382.JPG"
+  },
+  {
+    "path": "/images/tours/ha-long/11-cha-muc-ha-long.jpg",
+    "regionCode": "ha-long",
+    "landmarkName": "Chả mực Hạ Long",
+    "caption": "Món chả mực giã tay vàng ruộm đặc sản Hạ Long",
+    "category": "Ẩm thực",
+    "credit": "Hoangkid (Đặng Thái Hoàng)",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ch%E1%BA%A3_m%E1%BB%B1c.jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/01-ancient-town-lanterns.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Phố cổ Hội An & Sông Hoài",
+    "caption": "Phố cổ Hội An rực rỡ sắc đèn lồng bên dòng sông Hoài thơ mộng",
+    "category": "Toàn cảnh",
+    "credit": "Dennis G. Jarvis",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:A_boat_on_the_Thu_Bon_River,_Hoi_An,_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/02-japanese-covered-bridge.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Chùa Cầu Hội An",
+    "caption": "Chùa Cầu (Lai Viễn Kiều) – biểu tượng kiến trúc hơn 400 năm tuổi",
+    "category": "Toàn cảnh",
+    "credit": "katiebordner",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Japanese_Covered_Bridge_in_Hoi_An,_built_in_1590s_(26312974425).jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/03-lantern-street-night.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Phố đèn lồng về đêm",
+    "caption": "Con phố treo đầy đèn lồng lụa lung linh khi đêm xuống tại Hội An",
+    "category": "Trải nghiệm",
+    "credit": "lumoplank",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hoi_An_-_HoiAn1441.jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/04-yellow-walls-old-town.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Tường vàng phố cổ Hội An",
+    "caption": "Những dãy nhà cổ mái ngói rêu phong và bức tường vàng đặc trưng",
+    "category": "Toàn cảnh",
+    "credit": "lumoplank",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hoi_An_-_HoiAn1457.jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/05-bay-mau-basket-boat.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Thuyền thúng Rừng dừa Bảy Mẫu",
+    "caption": "Trải nghiệm chèo thuyền thúng truyền thống tại Rừng dừa Bảy Mẫu",
+    "category": "Trải nghiệm",
+    "credit": "Chester Ho chesterho",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Basket_Boat_and_the_Bamboo_forest_(Unsplash).jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/06-thu-bon-river-sunset.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Hoàng hôn sông Thu Bồn",
+    "caption": "Ánh hoàng hôn nhuộm vàng mặt sông Thu Bồn và những con thuyền gỗ",
+    "category": "Toàn cảnh",
+    "credit": "Omar David Sandoval Sida",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hoi_An_%26_Thu_Bon_River_2024.jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/07-fujian-assembly-hall.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Hội quán Phúc Kiến",
+    "caption": "Cổng tam quan và kiến trúc chạm khắc tinh xảo tại Hội quán Phúc Kiến",
+    "category": "Trải nghiệm",
+    "credit": "Suicasmo",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fujian_Assembly_Hall,_Hoi_An_20190920.jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/08-an-bang-beach.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Biển An Bàng",
+    "caption": "Bãi biển An Bàng cát trắng nắng vàng cách phố cổ chỉ vài phút đi xe",
+    "category": "Toàn cảnh",
+    "credit": "Isabell Schulz",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:An_Bang_Beach_(46353448872).jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/09-riverside-villa.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Villa ven sông Hội An",
+    "caption": "Không gian lưu trú kiến trúc cổ thanh bình tại Hội An",
+    "category": "Lưu trú",
+    "credit": "Rudolph.A.Furtado",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Rudolph.A.Furtado_at_%27Thien_Trung_Hotel%27_pool_in_Hoi_An..JPG"
+  },
+  {
+    "path": "/images/tours/hoi-an/10-cao-lau-hoi-an.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Cao lầu Hội An",
+    "caption": "Tô cao lầu đậm đà với sợi mì dai, thịt xá xíu và rau sống Trà Quế",
+    "category": "Ẩm thực",
+    "credit": "Christophe95",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cao_l%E1%BA%A7u_in_Hoi_An.jpg"
+  },
+  {
+    "path": "/images/tours/hoi-an/11-banh-mi-hoi-an.jpg",
+    "regionCode": "hoi-an",
+    "landmarkName": "Bánh mì Hội An",
+    "caption": "Ổ bánh mì giòn rụm đầy ắp nhân thịt và rau thơm trứ danh Hội An",
+    "category": "Ẩm thực",
+    "credit": "Andy Li",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Special_Baguette_(B%C3%A1nh_m%C3%AC)_-_Banh_Mi_Ancient_Saigon_2024-12-20.jpg"
+  },
+  {
+    "path": "/images/tours/hue/01-ngo-mon-gate.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Ngọ Môn - Đại Nội Huế",
+    "caption": "Cổng Ngọ Môn uy nghi dẫn vào Hoàng thành Huế",
+    "category": "Toàn cảnh",
+    "credit": "Suicasmo",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Meridian_Gate_(Citadel_of_Hue)_20190916-1.jpg"
+  },
+  {
+    "path": "/images/tours/hue/02-thai-hoa-palace.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Điện Thái Hòa",
+    "caption": "Kiến trúc cung điện sơn son thếp vàng trong Đại Nội Huế",
+    "category": "Toàn cảnh",
+    "credit": "Gary Todd from Xinzheng, China",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Palace_of_Supreme_Harmony_(Dien_Thai_Hoa),_Nguyen_Dynasty_Forbidden_City,_Hue_(15250435799).jpg"
+  },
+  {
+    "path": "/images/tours/hue/03-thien-mu-pagoda.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Chùa Thiên Mụ",
+    "caption": "Tháp Phước Duyên bảy tầng cổ kính bên bờ sông Hương",
+    "category": "Toàn cảnh",
+    "credit": "CEphoto, Uwe Aranas",
+    "license": "CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hue_Vietnam_Thien-Mu-Temple-and-Pagoda-01.jpg"
+  },
+  {
+    "path": "/images/tours/hue/04-khai-dinh-tomb.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Lăng Khải Định",
+    "caption": "Kiến trúc giao thoa Đông - Tây độc đáo tại Lăng Khải Định",
+    "category": "Trải nghiệm",
+    "credit": "dronepicr",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Grab_von_Kaiser_Khai_Dinh_Hue_(27767184939).jpg"
+  },
+  {
+    "path": "/images/tours/hue/05-tu-duc-tomb.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Lăng Tự Đức",
+    "caption": "Không gian sơn thủy hữu tình và hồ Lưu Khiêm tại Lăng Tự Đức",
+    "category": "Trải nghiệm",
+    "credit": "CEphoto, Uwe Aranas",
+    "license": "CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hue_Vietnam_Tomb-of-Emperor-Tu-Duc-03.jpg"
+  },
+  {
+    "path": "/images/tours/hue/06-perfume-river-dragon-boat.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Thuyền rồng Sông Hương",
+    "caption": "Thuyền rồng du ngoạn và nghe Ca Huế trên dòng sông Hương thơ mộng",
+    "category": "Trải nghiệm",
+    "credit": "P. Hughes",
+    "license": "CC BY 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hu%E1%BA%BF_-_Vietnamese_dragon_boat_operating_as_a_tourist_vessel_on_the_Perfume_River.jpg"
+  },
+  {
+    "path": "/images/tours/hue/07-truong-tien-bridge.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Cầu Trường Tiền",
+    "caption": "Cây cầu thép sáu vài mười hai nhịp bắc qua sông Hương",
+    "category": "Toàn cảnh",
+    "credit": "Hưng Hồ Bá",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:C%E1%BA%A7u_Tr%C6%B0%E1%BB%9Dng_Ti%E1%BB%81n_(15404847589).jpg"
+  },
+  {
+    "path": "/images/tours/hue/08-lap-an-lagoon.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Đầm Lập An - Lăng Cô",
+    "caption": "Khung cảnh vịnh Lăng Cô và đầm Lập An trong xanh tựa tranh thủy mặc",
+    "category": "Toàn cảnh",
+    "credit": "Edgardo W. Olivera",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Laguna_Lap_An,_Provincia_de_Thua_Thien-Hue,_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/hue/09-hue-heritage-hotel.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Khách sạn di sản Huế",
+    "caption": "Kiến trúc lưu trú cổ điển mang hơi thở cố đô bên sông Hương",
+    "category": "Lưu trú",
+    "credit": "David McKelvey from Brisbane, Australia",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:My_room_at_Vina_Hotel,_Hue_(6927389694).jpg"
+  },
+  {
+    "path": "/images/tours/hue/10-bun-bo-hue.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Bún bò Huế",
+    "caption": "Tô bún bò Huế đậm đà hương sả ớt đặc sản đất cố đô",
+    "category": "Ẩm thực",
+    "credit": "pelican from Tokyo, Japan",
+    "license": "CC BY-SA 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bun_Bo_Hue_(23409070614).jpg"
+  },
+  {
+    "path": "/images/tours/hue/11-minh-mang-tomb.jpg",
+    "regionCode": "hue",
+    "landmarkName": "Lăng Minh Mạng",
+    "caption": "Kiến trúc đối xứng uy nghiêm giữa rừng thông tại Lăng Minh Mạng",
+    "category": "Trải nghiệm",
+    "credit": "CEphoto, Uwe Aranas",
+    "license": "CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hue_Vietnam_Tomb-of-Emperor-Minh-Mang-01.jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/01-sao-beach.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Bãi Sao Phú Quốc",
+    "caption": "Bờ cát trắng mịn và hàng dừa nghiêng bên làn nước trong xanh ở Bãi Sao",
+    "category": "Toàn cảnh",
+    "credit": "Vivu Vietnam",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jw-marriott-phu-quoc-bai-kem.jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/02-hon-thom-cable-car.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Cáp treo Hòn Thơm",
+    "caption": "Cáp treo vượt biển dài nhất thế giới nối An Thới ra đảo Hòn Thơm",
+    "category": "Di chuyển",
+    "credit": "Vivu Vietnam",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cap-treo-hon-thom-qua-thi-tran.jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/03-an-thoi-archipelago.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Quần đảo An Thới",
+    "caption": "Những hòn đảo hoang sơ và tàu du lịch tại quần đảo An Thới",
+    "category": "Toàn cảnh",
+    "credit": "Alexey Komarov",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:An_Thoi,_Phu_Quoc,_Vietnam,_5_March_2019.jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/04-coral-snorkeling.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Lặn ngắm san hô Phú Quốc",
+    "caption": "Vùng biển trong xanh và rạn san hô đảo ngọc Phú Quốc",
+    "category": "Trải nghiệm",
+    "credit": "dronepicr",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Amazing_beach_on_Phu_Quoc_island_Vietnam_(38647607275).jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/05-dinh-cau-sunset.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Dinh Cậu Phú Quốc",
+    "caption": "Ghềnh đá và miếu Dinh Cậu nổi bật trong ánh chiều tà",
+    "category": "Toàn cảnh",
+    "credit": "Sketyl none",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Dinh_C%E1%BA%ADu_(37111073673).jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/06-ham-ninh-pier.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Làng chài Hàm Ninh",
+    "caption": "Cầu cảng và thuyền cá tại làng chài cổ Hàm Ninh, Phú Quốc",
+    "category": "Trải nghiệm",
+    "credit": "Tonbi ko",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Beach_near_Ham_Ninh_Phu_Quoc.JPG"
+  },
+  {
+    "path": "/images/tours/phu-quoc/07-phu-quoc-resort.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Resort ven biển Phú Quốc",
+    "caption": "Khu nghỉ dưỡng hướng biển với hồ bơi và rặng dừa xanh mát",
+    "category": "Lưu trú",
+    "credit": "Elmschrat",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:1_Phu_Quoc_beach_Saigon_Phu_Quoc_Resort_and_Spa.jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/08-night-market-seafood.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Hải sản Chợ đêm Phú Quốc",
+    "caption": "Hải sản tươi ngon bày bán nhộn nhịp tại chợ đêm Phú Quốc",
+    "category": "Ẩm thực",
+    "credit": "FrogsLegs71",
+    "license": "CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Live_seafood_for_sale_in_Phu_Quoc_night_market_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/09-bai-dai-ganh-dau.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Bãi Dài & Gành Dầu",
+    "caption": "Bờ biển Bãi Dài hoang sơ thanh bình ở phía Bắc đảo ngọc",
+    "category": "Toàn cảnh",
+    "credit": "dronepicr",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Beach_bungalows_Phu_Quoc_(24675993087).jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/10-duong-dong-estuary.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Cửa biển Dương Đông",
+    "caption": "Tàu cá neo đậu bình yên tại cửa sông Dương Đông, Phú Quốc",
+    "category": "Toàn cảnh",
+    "credit": "Elmschrat",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Rocks_Phu_Quoc.jpg"
+  },
+  {
+    "path": "/images/tours/phu-quoc/11-west-coast-sunset.jpg",
+    "regionCode": "phu-quoc",
+    "landmarkName": "Hoàng hôn biển Tây Phú Quốc",
+    "caption": "Khoảnh khắc hoàng hôn rực rỡ trên vùng biển phía Tây đảo Phú Quốc",
+    "category": "Toàn cảnh",
+    "credit": "Eila Lifflander 3ilaliff",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Phu_Quoc,_Vietnam_2_(Unsplash).jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/01-muong-hoa-terraces.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Thung lũng Mường Hoa",
+    "caption": "Ruộng bậc thang Mường Hoa uốn lượn giữa mây núi Sa Pa",
+    "category": "Toàn cảnh",
+    "credit": "Christophe95",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:M%C6%B0%E1%BB%9Dng_Hoa_Valley_01.jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/02-fansipan-summit.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Đỉnh Fansipan",
+    "caption": "Đỉnh Fansipan - Nóc nhà Đông Dương bồng bềnh trong biển mây",
+    "category": "Toàn cảnh",
+    "credit": "Vivu Vietnam",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fansipan_Summit_3143m_aerial_view_Sa_Pa_Lao_Cai_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/03-fansipan-cable-car.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Cáp treo Fansipan",
+    "caption": "Hệ thống cáp treo Fansipan băng qua thung lũng và mây mù",
+    "category": "Di chuyển",
+    "credit": "Vivu Vietnam",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fansipan_summit_spiritual_complex_bare_tree_sea_of_clouds_Sa_Pa_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/04-cat-cat-village.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Bản Cát Cát",
+    "caption": "Bản Cát Cát với những nếp nhà gỗ và sắc màu văn hóa H'Mông",
+    "category": "Trải nghiệm",
+    "credit": "Diego Angel",
+    "license": "CC BY 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cat_Cat_Girls_(42397390).jpeg"
+  },
+  {
+    "path": "/images/tours/sa-pa/05-silver-waterfall.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Thác Bạc Sa Pa",
+    "caption": "Dòng thác trắng xóa đổ xuống từ núi rừng Hoàng Liên Sơn",
+    "category": "Toàn cảnh",
+    "credit": "Weendang",
+    "license": "CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Pa_S%C4%A9_Waterfall,_Mang_Den_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/06-sapa-stone-church.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Nhà thờ đá Sa Pa",
+    "caption": "Nhà thờ đá cổ kính tại trung tâm thị xã Sa Pa",
+    "category": "Toàn cảnh",
+    "credit": "Christophe95",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Church_of_Sa_Pa.jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/07-sapa-market.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Chợ phiên Sa Pa",
+    "caption": "Sắc màu thổ cẩm và nông sản tại chợ vùng cao Sa Pa",
+    "category": "Trải nghiệm",
+    "credit": "KS Chew",
+    "license": "CC BY 2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Mu_coi_Vietnam.jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/08-muong-hoa-homestay.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Homestay Mường Hoa",
+    "caption": "Nhà sàn gỗ và bản làng giữa ruộng bậc thang ở Sa Pa",
+    "category": "Lưu trú",
+    "credit": "Soibien032016",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sapa_(231751345).jpeg"
+  },
+  {
+    "path": "/images/tours/sa-pa/09-sapa-town-hotel.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Khách sạn trung tâm Sa Pa",
+    "caption": "Kiến trúc phố núi và khách sạn tại thị xã Sa Pa",
+    "category": "Lưu trú",
+    "credit": "Quangpraha",
+    "license": "CC0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sa-pa-3006284.jpg"
+  },
+  {
+    "path": "/images/tours/sa-pa/10-o-quy-ho-pass.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Đèo Ô Quy Hồ",
+    "caption": "Cung đường đèo Ô Quy Hồ hùng vĩ nối Lào Cai và Lai Châu",
+    "category": "Di chuyển",
+    "credit": "Liftold (thảo luận)",
+    "license": "CC BY 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:%C4%90%C3%A8o_%C3%94_Quy_H%E1%BB%93_1.JPG"
+  },
+  {
+    "path": "/images/tours/sa-pa/11-sapa-hotpot-bbq.jpg",
+    "regionCode": "sa-pa",
+    "landmarkName": "Ẩm thực Tây Bắc Sa Pa",
+    "caption": "Nồi lẩu nóng và đồ nướng đặc sản giữa tiết trời se lạnh Sa Pa",
+    "category": "Ẩm thực",
+    "credit": "Mozzihh",
+    "license": "CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hotpot_1212-0701.jpg"
+  }
+]

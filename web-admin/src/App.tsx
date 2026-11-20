@@ -1,608 +1,1090 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Avatar } from '@astryxdesign/core/Avatar';
+import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer';
+import { LayerProvider } from '@astryxdesign/core/Layer';
+import { Layout } from '@astryxdesign/core/Layout';
+import { Theme } from '@astryxdesign/core/theme';
 import {
+  authLogin,
+  authMe,
   formatVnd,
-  getBooking,
+  getAuthToken,
   getBookings,
-  getHello,
   getRegions,
   getTours,
-  getUsers,
-  statusBadge,
+  noteTypeMeta,
+  serviceModeMeta,
+  setAuthToken,
+  setUnauthorizedHandler,
+  statusMeta,
   type Booking,
   type Region,
   type Tour,
   type User,
 } from './api';
-import CustomerCustomizeModal from './components/CustomerCustomizeModal';
-import GuidePresetEditor from './components/GuidePresetEditor';
-import BookingWorkspace from './components/BookingWorkspace';
-import Icon, { type IconName } from './components/Icon';
+import { BookingRequoteWorkspace } from './components/BookingRequoteWorkspace';
+import { DemoSwitcherBar } from './components/DemoSwitcherBar';
+import { GuidePresetEditor } from './components/GuidePresetEditor';
+import { Icon } from './components/Icon';
+import { LoginPage } from './components/LoginPage';
+import { SafeImage } from './components/SafeImage';
+import { tripBuilderAdminTheme } from './theme';
 
-function getInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length === 0) return 'U';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function getServices(tour: Tour): { icon: IconName; label: string }[] {
-  const cats = tour.steps.map((s) => s.category.toLowerCase());
-  const list: { icon: IconName; label: string }[] = [];
-  if (cats.some((c) => c.includes('di chuyển') || c.includes('xe'))) list.push({ icon: 'bus', label: 'Xe đưa đón' });
-  if (cats.some((c) => c.includes('khách sạn') || c.includes('lưu trú'))) list.push({ icon: 'bed', label: 'Khách sạn' });
-  if (cats.some((c) => c.includes('trải nghiệm') || c.includes('tham quan'))) list.push({ icon: 'ticket', label: 'Trải nghiệm' });
-  if (cats.some((c) => c.includes('ăn') || c.includes('ẩm thực'))) list.push({ icon: 'utensils', label: 'Ẩm thực' });
-  return list;
-}
-
-function durationLabel(days: number): string {
-  return days > 1 ? `${days}N${days - 1}Đ` : '1 ngày';
-}
+type NavSectionKey = 'overview' | 'bookings' | 'tours';
+type BookingFilter = 'ALL' | 'ACTION' | 'REQUOTED' | 'CONFIRMED' | 'CANCELLED';
+type LedgerFilter = 'ALL' | 'ACTION' | 'REQUOTED' | 'CONFIRMED';
 
 export default function App() {
-  const [roleMode, setRoleMode] = useState<'CUSTOMER' | 'GUIDE'>('CUSTOMER');
-  const [serverOnline, setServerOnline] = useState<boolean>(true);
-  const [dark, setDark] = useState<boolean>(() =>
-    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  const [mode, setMode] = useState<'light' | 'dark'>(() =>
+    localStorage.getItem('tb_admin_theme') === 'dark' ? 'dark' : 'light'
+  );
+  const [user, setUser] = useState<User | null>(null);
+  const [initialParams] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      demoEmail: params.get('demoEmail')?.trim() || '',
+      bookingCode: params.get('bookingCode')?.trim() || '',
+    };
+  });
+
+  const [authChecking, setAuthChecking] = useState(() =>
+    Boolean(initialParams.demoEmail || getAuthToken())
   );
 
-  const [customers, setCustomers] = useState<User[]>([]);
-  const [guides, setGuides] = useState<User[]>([]);
+  const [section, setSection] = useState<NavSectionKey>('overview');
+  const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ACTION');
+  const [bookingFilter, setBookingFilter] = useState<BookingFilter>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [regions, setRegions] = useState<Region[]>([]);
-  const [currentCustomer, setCurrentCustomer] = useState<User | null>(null);
-  const [currentGuide, setCurrentGuide] = useState<User | null>(null);
-
-  const [tab, setTab] = useState<'tours' | 'bookings'>('tours');
-  const [selectedRegionId, setSelectedRegionId] = useState<number | 'ALL'>('ALL');
-
   const [tours, setTours] = useState<Tour[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [drawerBooking, setDrawerBooking] = useState<Booking | null>(null);
 
-  const [bookingTour, setBookingTour] = useState<Tour | null>(null);
-  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
-  const [activeWorkspaceBooking, setActiveWorkspaceBooking] = useState<Booking | null>(null);
-  const [editingPreset, setEditingPreset] = useState<Tour | null>(null);
-  const [creatingPreset, setCreatingPreset] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingTour, setEditingTour] = useState<Tour | null>(null);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-    try {
-      localStorage.setItem('tb-theme', dark ? 'dark' : 'light');
-    } catch {
-      /* bỏ qua khi trình duyệt chặn localStorage */
-    }
-  }, [dark]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    getHello()
-      .then(() => setServerOnline(true))
-      .catch(() => setServerOnline(false));
-    getRegions().then(setRegions).catch(() => setRegions([]));
-    getUsers('CUSTOMER').then((list) => {
-      setCustomers(list);
-      if (list.length > 0) setCurrentCustomer(list[0]);
-    });
-    getUsers('GUIDE').then((list) => {
-      setGuides(list);
-      if (list.length > 0) setCurrentGuide(list[0]);
-    });
+  const pendingBookingCodeRef = useRef<string | null>(
+    initialParams.bookingCode || null
+  );
+
+  const handleLogout = useCallback(() => {
+    setAuthToken(null);
+    setUser(null);
+    setBookings([]);
+    setTours([]);
+    setSelectedBooking(null);
+    setDrawerBooking(null);
   }, []);
 
-  const refreshData = () => {
-    setLoadingList(true);
-    const jobs: Promise<unknown>[] = [];
-    if (roleMode === 'CUSTOMER') {
-      jobs.push(getTours().then(setTours));
-      if (currentCustomer) jobs.push(getBookings({ customerId: currentCustomer.id }).then(setBookings));
-    } else if (currentGuide) {
-      jobs.push(getTours(currentGuide.id).then(setTours));
-      jobs.push(getBookings({ guideId: currentGuide.id }).then(setBookings));
-    }
-    Promise.allSettled(jobs).finally(() => setLoadingList(false));
-  };
+  useEffect(() => {
+    setUnauthorizedHandler(handleLogout);
+    return () => setUnauthorizedHandler(null);
+  }, [handleLogout]);
 
   useEffect(() => {
-    refreshData();
-  }, [roleMode, currentCustomer, currentGuide]);
+    localStorage.setItem('tb_admin_theme', mode);
+    document.documentElement.classList.toggle('dark', mode === 'dark');
+    document.documentElement.setAttribute('data-theme', mode);
+  }, [mode]);
 
   useEffect(() => {
-    if (selectedBookingId) {
-      getBooking(selectedBookingId)
-        .then(setActiveWorkspaceBooking)
-        .catch(() => setActiveWorkspaceBooking(null));
-    } else {
-      setActiveWorkspaceBooking(null);
-    }
-  }, [selectedBookingId]);
+    let active = true;
+    const demoEmail = initialParams.demoEmail;
 
-  // Đổi vai thông minh: đang mở 1 đơn → tự chọn đúng Khách / Guide của đơn đó
-  const handleSmartRoleSwitch = (targetRole: 'CUSTOMER' | 'GUIDE', explicitBooking?: Booking | null) => {
-    const b = explicitBooking || activeWorkspaceBooking;
-    setCreatingPreset(false);
-    setEditingPreset(null);
-    if (targetRole === 'GUIDE') {
-      if (b?.guide) setCurrentGuide(guides.find((g) => g.id === b.guide.id) || b.guide);
-      setRoleMode('GUIDE');
-    } else {
-      if (b?.customer) setCurrentCustomer(customers.find((c) => c.id === b.customer.id) || b.customer);
-      setRoleMode('CUSTOMER');
+    const clearQueryParams = () => {
+      if (window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+      }
+    };
+
+    if (demoEmail) {
+      authLogin(demoEmail, '123456')
+        .then((res) => {
+          if (!active) return;
+          setAuthToken(res.token);
+          setUser(res.user);
+          setSelectedBooking(null);
+          setDrawerBooking(null);
+          clearQueryParams();
+        })
+        .catch((err) => {
+          if (!active) return;
+          setError(err instanceof Error ? err.message : 'Không thể chuyển nhanh tài khoản Guide');
+          handleLogout();
+          clearQueryParams();
+        })
+        .finally(() => {
+          if (active) setAuthChecking(false);
+        });
+      return () => {
+        active = false;
+      };
     }
+
+    clearQueryParams();
+    const token = getAuthToken();
+    if (!token) {
+      return;
+    }
+    authMe()
+      .then((u) => {
+        if (!active) return;
+        if (u.role !== 'GUIDE') {
+          handleLogout();
+          return;
+        }
+        setUser(u);
+      })
+      .catch(() => {
+        if (active) handleLogout();
+      })
+      .finally(() => {
+        if (active) setAuthChecking(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [handleLogout, initialParams.demoEmail]);
+
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    setError('');
+    try {
+      const [regList, tourList, bookingList] = await Promise.all([
+        getRegions(),
+        getTours(user.id),
+        getBookings(),
+      ]);
+      setRegions(regList);
+      setTours(tourList);
+      setBookings(bookingList);
+
+      if (pendingBookingCodeRef.current) {
+        const targetCode = pendingBookingCodeRef.current.toUpperCase();
+        pendingBookingCodeRef.current = null;
+        const found = bookingList.find((b) => b.code.toUpperCase() === targetCode);
+        if (found) {
+          setSelectedBooking(found);
+          setSection('bookings');
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được dữ liệu điều phối');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) void loadData();
+    });
+    return () => {
+      active = false;
+    };
+  }, [user, loadData]);
+
+  const actionQueue = useMemo(
+    () => bookings.filter((b) => statusMeta(b.status).actionNeeded),
+    [bookings]
+  );
+
+  const requotedList = useMemo(
+    () => bookings.filter((b) => b.status === 'REQUOTED'),
+    [bookings]
+  );
+
+  const confirmedList = useMemo(
+    () => bookings.filter((b) => b.status === 'CONFIRMED'),
+    [bookings]
+  );
+
+  const cancelledList = useMemo(
+    () => bookings.filter((b) => b.status === 'CANCELLED'),
+    [bookings]
+  );
+
+  const confirmedRevenue = useMemo(
+    () => confirmedList.reduce((acc, b) => acc + (b.totalPrice || 0), 0),
+    [confirmedList]
+  );
+
+  const ledgerFilteredBookings = useMemo(() => {
+    if (ledgerFilter === 'ALL') return bookings;
+    if (ledgerFilter === 'ACTION') return actionQueue;
+    if (ledgerFilter === 'REQUOTED') return requotedList;
+    return confirmedList;
+  }, [ledgerFilter, bookings, actionQueue, requotedList, confirmedList]);
+
+  const filteredBookings = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return bookings.filter((b) => {
+      if (bookingFilter === 'ACTION' && !statusMeta(b.status).actionNeeded) return false;
+      if (bookingFilter === 'REQUOTED' && b.status !== 'REQUOTED') return false;
+      if (bookingFilter === 'CONFIRMED' && b.status !== 'CONFIRMED') return false;
+      if (bookingFilter === 'CANCELLED' && b.status !== 'CANCELLED') return false;
+      if (!q) return true;
+      return (
+        b.code.toLowerCase().includes(q) ||
+        b.customer.fullName.toLowerCase().includes(q) ||
+        b.tourTitleSnapshot.toLowerCase().includes(q)
+      );
+    });
+  }, [bookings, bookingFilter, searchQuery]);
+
+  const updateBookingInList = (updated: Booking) => {
+    setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+    setSelectedBooking((cur) => (cur?.id === updated.id ? updated : cur));
+    setDrawerBooking((cur) => (cur?.id === updated.id ? updated : cur));
   };
 
-  const goTab = (t: 'tours' | 'bookings') => {
-    setTab(t);
-    setSelectedBookingId(null);
-    setCreatingPreset(false);
-    setEditingPreset(null);
-    refreshData();
-  };
-
-  const waitingRequoteCount = bookings.filter((b) => b.status === 'WAITING_REQUOTE').length;
-  const requotedCount = bookings.filter((b) => b.status === 'REQUOTED').length;
-  const filteredTours = selectedRegionId === 'ALL' ? tours : tours.filter((t) => t.regionId === selectedRegionId);
-  const activeUser = roleMode === 'CUSTOMER' ? currentCustomer : currentGuide;
-  const isGuide = roleMode === 'GUIDE';
-  const badgeCount = isGuide ? waitingRequoteCount : requotedCount;
-
-  return (
-    <div className="min-h-screen flex flex-col bg-ground text-ink">
-      {/* ============ Thanh trình diễn (chỉ dùng khi demo) ============ */}
-      <div className="bg-[#081a30] text-navy-ink-2 text-xs">
-        <div className="mx-auto max-w-6xl px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
-          <p className="flex items-center gap-2 min-w-0">
-            <span className="coupon-head text-[0.72rem] text-[#f2c14e]">Chế độ trình diễn</span>
-            <span className="hidden md:inline truncate">
-              {selectedBookingId && activeWorkspaceBooking
-                ? `Đang mở đơn ${activeWorkspaceBooking.code}. Đổi vai sẽ tự chọn đúng Khách / Guide của đơn này.`
-                : 'Chuyển góc nhìn Khách hàng ↔ Tour Guide ngay trên một màn hình.'}
-            </span>
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div role="group" aria-label="Chọn góc nhìn" className="inline-flex rounded-md border border-white/15 p-0.5">
-              {(['CUSTOMER', 'GUIDE'] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  aria-pressed={roleMode === r}
-                  onClick={() => handleSmartRoleSwitch(r)}
-                  className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 font-semibold cursor-pointer transition-colors ${
-                    roleMode === r ? 'bg-navy-ink text-[#081a30]' : 'text-navy-ink-2 hover:text-white'
-                  }`}
-                >
-                  <Icon name={r === 'CUSTOMER' ? 'user' : 'compass'} size={14} />
-                  {r === 'CUSTOMER' ? 'Khách hàng' : 'Tour Guide'}
-                </button>
-              ))}
-            </div>
-
-            <label className="sr-only" htmlFor="demo-account">Tài khoản mẫu</label>
-            {roleMode === 'CUSTOMER' ? (
-              <select
-                id="demo-account"
-                value={currentCustomer?.id || ''}
-                onChange={(e) => {
-                  setCurrentCustomer(customers.find((x) => x.id === Number(e.target.value)) || null);
-                  setSelectedBookingId(null);
-                }}
-                className="rounded-md border border-white/15 bg-[#0c2340] px-2 py-1 text-navy-ink font-medium"
-              >
-                {customers.map((u) => (
-                  <option key={u.id} value={u.id}>Khách: {u.fullName}</option>
-                ))}
-              </select>
-            ) : (
-              <select
-                id="demo-account"
-                value={currentGuide?.id || ''}
-                onChange={(e) => {
-                  setCurrentGuide(guides.find((x) => x.id === Number(e.target.value)) || null);
-                  setSelectedBookingId(null);
-                  setSelectedRegionId('ALL');
-                }}
-                className="rounded-md border border-white/15 bg-[#0c2340] px-2 py-1 text-navy-ink font-medium"
-              >
-                {guides.map((g) => (
-                  <option key={g.id} value={g.id}>Guide: {g.fullName} ({g.regionName})</option>
-                ))}
-              </select>
-            )}
-
-            <span className="inline-flex items-center gap-1.5 border-l border-white/15 pl-2.5" title="Kết nối tới máy chủ">
-              <span className={`h-2 w-2 rounded-full ${serverOnline ? 'bg-[#5fd39a]' : 'bg-[#ff5c72]'}`} />
-              {serverOnline ? 'Máy chủ online' : 'Mất kết nối máy chủ'}
-            </span>
-          </div>
+  const renderBookingDossierList = (list: Booking[], emptyText: string) => {
+    if (list.length === 0) {
+      return (
+        <div className="flagship-card p-10 text-center space-y-2.5">
+          <Icon name="clipboard" size={24} strokeWidth={1.5} className="text-ink-3 mx-auto" />
+          <div className="text-base font-medium text-ink-2">{emptyText}</div>
         </div>
-      </div>
+      );
+    }
 
-      {/* ============ Header ============ */}
-      <header className="sticky top-0 z-30 bg-navy text-navy-ink border-b border-white/10">
-        <div className="mx-auto max-w-6xl px-4 h-16 flex items-center justify-between gap-4">
-          <button type="button" onClick={() => goTab('tours')} className="flex items-center gap-2.5 cursor-pointer">
-            <span className="grid h-9 w-9 place-items-center rounded-md bg-red text-white dark:text-[#2a0710]">
-              <Icon name="ticket" size={20} />
-            </span>
-            <span className="text-left leading-none">
-              <span className="block font-head text-2xl font-bold tracking-wide uppercase">TripBuilder</span>
-              <span className="hidden sm:block text-[0.7rem] text-navy-ink-2 mt-0.5">Lịch trình riêng cùng Guide bản địa</span>
-            </span>
-          </button>
+    return (
+      <div className="space-y-3.5">
+        {list.map((b) => {
+          const st = statusMeta(b.status);
+          const modeInfo = serviceModeMeta(b.serviceMode);
+          const unpricedCount = b.steps.filter(
+            (s) => s.noteType === 'CUSTOM' && (s.pricePerPerson || 0) <= 0
+          ).length;
+          const needsUrgentAttention = st.actionNeeded || unpricedCount > 0;
 
-          <nav aria-label="Điều hướng chính" className="flex items-stretch h-full">
-            {([
-              { id: 'tours' as const, label: isGuide ? 'Tour của tôi' : 'Khám phá tour', count: tours.length },
-              { id: 'bookings' as const, label: isGuide ? 'Đơn & báo giá' : 'Chuyến đi của tôi', count: bookings.length },
-            ]).map((t) => {
-              const active = t.id === 'bookings' ? tab === 'bookings' || !!selectedBookingId : tab === 'tours' && !selectedBookingId;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => goTab(t.id)}
-                  aria-current={active ? 'page' : undefined}
-                  className={`relative flex items-center gap-2 px-3 sm:px-4 text-sm font-semibold cursor-pointer transition-colors ${
-                    active ? 'text-white' : 'text-navy-ink-2 hover:text-white'
-                  }`}
-                >
-                  {t.label}
-                  <span className="num text-xs text-navy-ink-2">{t.count}</span>
-                  {t.id === 'bookings' && badgeCount > 0 && (
-                    <span className="num rounded-full bg-red px-1.5 py-0.5 text-[0.68rem] font-bold text-white dark:text-[#2a0710]">
-                      {badgeCount}
+          return (
+            <div
+              key={b.id}
+              className={`flagship-card transition-colors duration-150 hover:border-rule-strong grid grid-cols-1 sm:grid-cols-[13.5rem_1fr_auto] ${
+                needsUrgentAttention ? 'border-l-4 border-l-coral' : ''
+              }`}
+            >
+              {/* Cột trái: Mã hồ sơ & Trạng thái */}
+              <div className="bg-surface-2 p-4 sm:p-5 flex sm:flex-col justify-between sm:justify-center gap-2 border-b sm:border-b-0 sm:border-r border-rule">
+                <div>
+                  <div className="text-[13px] font-medium text-ink-3">Mã hồ sơ</div>
+                  <div className="num text-lg font-semibold text-coral mt-0.5">{b.code}</div>
+                  <div className="num text-[13px] font-normal text-ink-3 mt-0.5">
+                    v{b.tourVersionSnapshot} · Vòng {b.revisionCount}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={`tag normal-case tracking-normal font-medium ${st.tagClass}`}>
+                    {st.short}
+                  </span>
+                </div>
+              </div>
+
+              {/* Cột giữa: Khách hàng, Hành trình & Ghi chú */}
+              <div className="p-4 sm:p-5 min-w-0 flex flex-col justify-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+                  <h3 className="font-display !font-semibold text-lg text-ink truncate">
+                    {b.tourTitleSnapshot}
+                  </h3>
+                  {b.postConfirmAdjustment && (
+                    <span className="tag tag-ochre normal-case tracking-normal font-medium">
+                      Đổi sau chốt
                     </span>
                   )}
-                  {active && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-t bg-red" />}
-                </button>
-              );
-            })}
-          </nav>
+                  {unpricedCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-coral-soft border border-coral/30 text-coral px-2.5 py-0.5 text-[13px] font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-coral" />
+                      {unpricedCount} mục chờ giá
+                    </span>
+                  )}
+                </div>
 
-          <div className="flex items-center gap-2">
-            {activeUser && (
-              <div className="hidden md:flex items-center gap-2.5 rounded-md border border-white/15 px-2.5 py-1.5">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-navy-ink text-navy text-[0.7rem] font-bold">
-                  {getInitials(activeUser.fullName)}
-                </span>
-                <span className="text-xs leading-tight">
-                  <span className="block font-semibold text-white">{activeUser.fullName}</span>
-                  <span className="block text-navy-ink-2">
-                    {isGuide ? `Guide · ${activeUser.regionName || 'Việt Nam'}` : 'Khách hàng'}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[14px] font-medium text-ink-2">
+                  <span className="inline-flex items-center gap-2 font-semibold text-ink text-[15px]">
+                    <Avatar
+                      src={b.customer.avatarUrl || undefined}
+                      name={b.customer.fullName}
+                      size="xsm"
+                    />
+                    <span>{b.customer.fullName}</span>
                   </span>
-                </span>
+                  <span className="inline-flex items-center gap-1.5 num">
+                    <Icon name="calendar" size={16} strokeWidth={1.5} className="text-ink-3" />
+                    {b.startDate}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 num">
+                    <Icon name="clock" size={16} strokeWidth={1.5} className="text-ink-3" />
+                    {b.days}N
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 num">
+                    <Icon name="users" size={16} strokeWidth={1.5} className="text-ink-3" />
+                    {b.guests} khách
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="tag" size={16} strokeWidth={1.5} className="text-ink-3" />
+                    {modeInfo.label}
+                  </span>
+                </div>
+
+                {b.customerNote && (
+                  <p className="text-sm leading-snug font-normal text-ink-2 bg-surface-2 border border-rule rounded-xl px-3.5 py-2 truncate">
+                    <span className="font-medium text-ink">Khách nhắn:</span> {b.customerNote}
+                  </p>
+                )}
               </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setDark((d) => !d)}
-              aria-label={dark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
-              className="grid h-9 w-9 place-items-center rounded-md border border-white/15 text-navy-ink-2 hover:text-white hover:border-white/40 cursor-pointer transition-colors"
-            >
-              <Icon name={dark ? 'sun' : 'moon'} size={18} />
-            </button>
-          </div>
-        </div>
-      </header>
 
-      {/* ============ Nội dung ============ */}
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-        {!serverOnline && (
-          <div role="alert" className="mb-6 flex items-start gap-3 rounded-lg border border-red/40 bg-red-soft px-4 py-3 text-sm text-ink">
-            <Icon name="alert" size={18} className="mt-0.5 text-red" />
-            <p>
-              Không kết nối được máy chủ ở <span className="num">localhost:8080</span>. Hãy chạy backend
-              (file <span className="num">run-demo.bat</span>) rồi tải lại trang.
-            </p>
-          </div>
-        )}
+              {/* Cột phải: Tổng báo giá & Thao tác */}
+              <div className="bg-surface-2/60 p-4 sm:p-5 flex sm:flex-col items-center sm:items-end justify-between gap-3 border-t sm:border-t-0 sm:border-l border-rule">
+                <div className="sm:text-right">
+                  <div className="text-[13px] font-medium text-ink-3">Tổng báo giá</div>
+                  <div className="num text-[22px] font-semibold text-coral mt-0.5 leading-tight">
+                    {formatVnd(b.totalPrice)}
+                  </div>
+                  {b.totalPrice !== b.originalTotalPrice && (
+                    <div className="num text-[13px] font-normal text-ink-3 line-through">
+                      {formatVnd(b.originalTotalPrice)}
+                    </div>
+                  )}
+                </div>
 
-        {selectedBookingId ? (
-          <BookingWorkspace
-            bookingId={selectedBookingId}
-            roleMode={roleMode}
-            onBack={() => {
-              setSelectedBookingId(null);
-              refreshData();
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    className="btn btn-ghost text-sm font-medium py-2 px-3.5"
+                    onClick={() => setDrawerBooking(b)}
+                  >
+                    Xem nhanh
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn text-sm font-medium py-2 px-4 ${
+                      st.actionNeeded ? 'btn-primary' : 'btn-ghost'
+                    }`}
+                    onClick={() => {
+                      setSelectedBooking(b);
+                      setSection('bookings');
+                    }}
+                  >
+                    <span>{st.actionNeeded ? 'Báo giá ngay' : 'Mở chi tiết'}</span>
+                    <Icon name="arrow-right" size={16} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const ledgerTitle =
+    ledgerFilter === 'ALL'
+      ? `Tất cả hồ sơ đặt tour (${bookings.length})`
+      : ledgerFilter === 'ACTION'
+      ? `Hồ sơ cần báo giá ngay (${actionQueue.length})`
+      : ledgerFilter === 'REQUOTED'
+      ? `Đơn đã gửi báo giá — chờ khách phản hồi (${requotedList.length})`
+      : `Chuyến đã chốt thành công (${confirmedList.length})`;
+
+  return (
+    <Theme theme={tripBuilderAdminTheme} mode={mode}>
+      <LayerProvider>
+        <div className="min-h-screen bg-canvas text-ink flex flex-col">
+          {/* Thanh Demo Switcher trên cùng */}
+          <DemoSwitcherBar
+            currentUser={user}
+            onSwitchUser={(nextUser) => {
+              setUser(nextUser);
+              setSelectedBooking(null);
+              setDrawerBooking(null);
+              setSection('overview');
             }}
-            onChanged={(updated) => {
-              if (updated) setActiveWorkspaceBooking(updated);
-              refreshData();
-            }}
-            onSwitchRoleWithSync={(targetRole, booking) => handleSmartRoleSwitch(targetRole, booking)}
+            activeBooking={selectedBooking || drawerBooking}
           />
-        ) : tab === 'tours' ? (
-          isGuide && (creatingPreset || editingPreset) && currentGuide ? (
-            <GuidePresetEditor
-              guideId={currentGuide.id}
-              guideName={currentGuide.fullName}
-              initialTour={editingPreset}
-              onCancel={() => {
-                setCreatingPreset(false);
-                setEditingPreset(null);
-              }}
-              onSaved={() => {
-                setCreatingPreset(false);
-                setEditingPreset(null);
-                refreshData();
+
+          {authChecking ? (
+            <div className="flex-1 flex items-center justify-center p-8 text-base font-medium text-ink-2">
+              Đang kiểm tra phiên Tour Guide
+            </div>
+          ) : !user ? (
+            <LoginPage
+              onSuccess={(token, loggedInUser) => {
+                setAuthToken(token);
+                setUser(loggedInUser);
               }}
             />
           ) : (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <div className="max-w-2xl">
-                  <h1 className="font-head text-4xl font-bold uppercase tracking-wide leading-none text-ink">
-                    {isGuide ? `Tour của ${currentGuide?.fullName ?? 'Guide'}` : 'Chọn chuyến đi của bạn'}
-                  </h1>
-                  <p className="mt-2 text-[0.95rem] text-ink-2">
-                    {isGuide
-                      ? 'Đăng tour mới hoặc sửa lịch trình và đơn giá từng mục của tour hiện có.'
-                      : 'Mỗi tour là một lịch trình chuẩn do Guide địa phương soạn. Giữ nguyên để đặt ngay, hoặc đổi khách sạn, bỏ, thêm hoạt động rồi nhờ Guide báo giá.'}
-                  </p>
-                </div>
-                {isGuide && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingPreset(null);
-                      setCreatingPreset(true);
-                    }}
-                    className="btn btn-primary btn-lg"
-                  >
-                    <Icon name="plus" size={18} />
-                    Đăng tour mới
-                  </button>
-                )}
-              </div>
-
-              {!isGuide && regions.length > 0 && (
-                <div role="group" aria-label="Lọc theo điểm đến" className="flex items-center gap-2 overflow-x-auto pb-1">
-                  <button type="button" aria-pressed={selectedRegionId === 'ALL'} onClick={() => setSelectedRegionId('ALL')} className="chip">
-                    <Icon name="globe" size={14} />
-                    Tất cả điểm đến <span className="num text-xs opacity-70">{tours.length}</span>
-                  </button>
-                  {regions.map((r) => {
-                    const count = tours.filter((t) => t.regionId === r.id).length;
-                    if (count === 0) return null;
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        aria-pressed={selectedRegionId === r.id}
-                        onClick={() => setSelectedRegionId(r.id)}
-                        className="chip"
-                      >
-                        <Icon name="pin" size={14} />
-                        {r.name} <span className="num text-xs opacity-70">{count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {loadingList && tours.length === 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-[26rem] rounded-lg border border-hairline bg-stock animate-pulse" />
-                  ))}
-                </div>
-              ) : filteredTours.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-hairline-strong bg-stock px-6 py-12 text-center">
-                  <p className="font-semibold text-ink">
-                    {isGuide ? 'Bạn chưa đăng tour nào.' : 'Chưa có tour ở điểm đến này.'}
-                  </p>
-                  <p className="mt-1 text-sm text-ink-2">
-                    {isGuide
-                      ? 'Bấm “Đăng tour mới” để soạn lịch trình theo ngày và đơn giá từng mục.'
-                      : 'Chọn “Tất cả điểm đến” để xem các tour khác.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredTours.map((t) => (
-                    <article
-                      key={t.id}
-                      className="group flex flex-col overflow-hidden rounded-lg border border-hairline bg-stock shadow-coupon transition-shadow duration-200 hover:shadow-lift"
+            <>
+              {/* Studio Header nền Đen Than #0F172A, cao 68px */}
+              <header className="sticky top-0 z-30 h-[68px] bg-flagship-dark text-white border-b border-white/15">
+                <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-5">
+                  <div className="flex items-center gap-5 lg:gap-8 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedBooking(null);
+                        setSection('overview');
+                      }}
+                      className="flex items-center gap-3 text-left cursor-pointer shrink-0"
                     >
-                      <div className="relative aspect-[16/10] overflow-hidden bg-stock-2">
-                        <img
-                          src={t.imageUrl}
-                          alt={`Cảnh ${t.regionName}`}
-                          loading="lazy"
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                        />
-                        <span className="coupon-head absolute left-3 top-3 rounded bg-navy/90 px-2 py-1 text-[0.72rem] text-navy-ink">
-                          {t.regionName} · {durationLabel(t.days)}
+                      <span className="h-10 w-10 rounded-xl bg-coral text-white flex items-center justify-center shrink-0">
+                        <Icon name="compass" size={18} strokeWidth={1.5} />
+                      </span>
+                      <div className="leading-tight">
+                        <div className="font-display !font-semibold text-lg text-white whitespace-nowrap">
+                          TripBuilder Studio
+                        </div>
+                        <div className="text-[13px] font-normal text-slate-300 truncate max-w-[170px]">
+                          {user.regionName || 'Điều phối Tour Guide'}
+                        </div>
+                      </div>
+                    </button>
+
+                    <nav
+                      className="flex items-center h-[68px] gap-1 lg:gap-2 overflow-x-auto no-scrollbar"
+                      aria-label="Điều hướng chính"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedBooking(null);
+                          setSection('overview');
+                        }}
+                        className={`h-full px-3 inline-flex items-center gap-2 text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
+                          section === 'overview' && !selectedBooking
+                            ? 'border-coral text-white font-semibold'
+                            : 'border-transparent text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        <Icon name="dashboard" size={16} strokeWidth={1.5} />
+                        <span>Tổng quan</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedBooking(null);
+                          setSection('bookings');
+                        }}
+                        className={`h-full px-3 inline-flex items-center gap-2 text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
+                          section === 'bookings' || Boolean(selectedBooking)
+                            ? 'border-coral text-white font-semibold'
+                            : 'border-transparent text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        <Icon name="clipboard" size={16} strokeWidth={1.5} />
+                        <span>Đơn đặt &amp; Báo giá</span>
+                        {actionQueue.length > 0 && (
+                          <span className="num text-sm font-normal text-slate-400">
+                            {actionQueue.length}
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedBooking(null);
+                          setSection('tours');
+                        }}
+                        className={`h-full px-3 inline-flex items-center gap-2 text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
+                          section === 'tours' && !selectedBooking
+                            ? 'border-coral text-white font-semibold'
+                            : 'border-transparent text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        <Icon name="map" size={16} strokeWidth={1.5} />
+                        <span>Tour mẫu</span>
+                        <span className="num text-sm font-normal text-slate-400">
+                          {tours.length}
                         </span>
+                      </button>
+                    </nav>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTour(null);
+                        setEditorOpen(true);
+                      }}
+                      className="btn btn-primary hidden sm:inline-flex text-sm font-medium py-2 px-3.5 whitespace-nowrap"
+                    >
+                      <Icon name="plus" size={16} strokeWidth={1.5} />
+                      <span>Tạo tour mẫu</span>
+                    </button>
+
+                    <div className="hidden 2xl:flex items-center gap-2 pl-2.5 pr-1 border-l border-white/15">
+                      <Avatar
+                        src={user.avatarUrl || undefined}
+                        name={user.fullName}
+                        size="xsm"
+                      />
+                      <span className="text-sm font-medium text-white max-w-[130px] truncate">
+                        {user.fullName}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMode((m) => (m === 'light' ? 'dark' : 'light'))}
+                      aria-label={mode === 'light' ? 'Bật nền tối' : 'Bật nền sáng'}
+                      title={mode === 'light' ? 'Bật nền tối' : 'Bật nền sáng'}
+                      className="h-9 w-9 rounded-xl border border-white/20 bg-white/10 inline-flex items-center justify-center text-slate-200 hover:text-white hover:bg-white/20 cursor-pointer transition-colors duration-150"
+                    >
+                      <Icon name={mode === 'light' ? 'moon' : 'sun'} size={16} strokeWidth={1.5} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      aria-label="Đăng xuất"
+                      title="Đăng xuất"
+                      className="h-9 w-9 rounded-xl border border-white/20 bg-white/10 inline-flex items-center justify-center text-slate-200 hover:text-rose-300 hover:bg-rose-500/20 cursor-pointer transition-colors duration-150"
+                    >
+                      <Icon name="logout" size={16} strokeWidth={1.5} />
+                    </button>
+                  </div>
+                </div>
+              </header>
+
+              {/* Main Content Container max-w-[1440px] */}
+              <main className="flex-1 mx-auto w-full max-w-[1440px] px-5 py-7 space-y-7">
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-crimson bg-crimson-soft px-5 py-3.5 flex items-start gap-3 text-base text-crimson"
+                  >
+                    <Icon name="alert" size={18} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+                    <div>
+                      <div className="font-semibold">Lỗi tải dữ liệu</div>
+                      <div className="text-sm font-normal">{error}</div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedBooking ? (
+                  <BookingRequoteWorkspace
+                    booking={selectedBooking}
+                    onBack={() => setSelectedBooking(null)}
+                    onUpdated={updateBookingInList}
+                  />
+                ) : section === 'overview' ? (
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <h1 className="font-display !font-semibold text-3xl sm:text-4xl text-ink">
+                          Điều phối báo giá &amp; lịch trình
+                        </h1>
+                        <p className="text-[15px] font-normal text-ink-2 mt-1">
+                          Điều phối viên phụ trách: {user.fullName} · {bookings.length} hồ sơ đang theo dõi
+                        </p>
                       </div>
-
-                      <div className="flex flex-1 flex-col gap-3 p-4">
-                        <h3 className="text-[1.05rem] font-semibold leading-snug text-ink">{t.title}</h3>
-                        <p className="text-sm text-ink-2 line-clamp-2">{t.description}</p>
-
-                        <ul className="flex flex-wrap gap-x-3.5 gap-y-1.5 text-xs text-ink-2">
-                          {getServices(t).map((s) => (
-                            <li key={s.label} className="inline-flex items-center gap-1.5">
-                              <Icon name={s.icon} size={14} className="text-ink-3" />
-                              {s.label}
-                            </li>
-                          ))}
-                          <li className="inline-flex items-center gap-1.5">
-                            <span className="num">{t.steps.length}</span> hoạt động
-                          </li>
-                        </ul>
-
-                        <div className="mt-auto flex items-center gap-2.5 pt-1">
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-stock-2 border border-hairline text-[0.7rem] font-bold text-ink-2">
-                            {getInitials(t.guide.fullName)}
-                          </span>
-                          <p className="text-xs leading-tight text-ink-2">
-                            <span className="block font-semibold text-ink">Guide {t.guide.fullName}</span>
-                            <span className="num">{t.guide.yearsExperience ?? 5}</span> năm kinh nghiệm · {t.guide.regionName || t.regionName}
-                          </p>
-                        </div>
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={loadData}
+                          disabled={loading}
+                          className="btn btn-ghost text-sm font-medium py-2 px-4"
+                        >
+                          <Icon name="restore" size={16} strokeWidth={1.5} />
+                          <span>{loading ? 'Đang tải' : 'Làm mới dữ liệu'}</span>
+                        </button>
                       </div>
+                    </div>
 
-                      <div className="perf-x flex items-center justify-between gap-3 px-4 py-3.5 bg-stock-2">
-                        <div>
-                          <span className="block text-[0.7rem] text-ink-3">Giá lịch trình chuẩn</span>
-                          <span className="num text-lg font-bold text-carbon">
-                            {formatVnd(t.basePricePerPerson)}
-                          </span>
-                          <span className="text-xs text-ink-3">/khách</span>
-                        </div>
-                        {isGuide ? (
+                    {/* Asymmetric Summary Strip — 12 cột bất đối xứng (5 + 7) */}
+                    <section
+                      aria-label="Tóm tắt vận hành điều phối"
+                      className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch"
+                    >
+                      {/* Khối tiêu điểm bên trái (5 cột) */}
+                      <div
+                        className={`lg:col-span-5 bg-surface border rounded-2xl p-5 flex flex-col justify-between gap-4 transition-colors duration-150 ${
+                          ledgerFilter === 'ACTION'
+                            ? 'border-coral/50 ring-1 ring-coral/25'
+                            : 'border-rule'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="inline-flex items-center gap-2 text-sm font-medium text-ink-2">
+                              <span className="w-2 h-2 rounded-full bg-coral shrink-0" />
+                              <span>Cần xử lý báo giá ngay</span>
+                            </div>
+                            <div className="num text-3xl font-semibold text-ink tabular-nums pt-1">
+                              {actionQueue.length}
+                            </div>
+                          </div>
+
                           <button
                             type="button"
-                            onClick={() => {
-                              setCreatingPreset(false);
-                              setEditingPreset(t);
-                            }}
-                            className="btn btn-ghost btn-sm"
+                            onClick={() => setLedgerFilter('ACTION')}
+                            aria-pressed={ledgerFilter === 'ACTION'}
+                            className={`btn text-sm font-medium py-2 px-3.5 shrink-0 ${
+                              ledgerFilter === 'ACTION' ? 'btn-primary' : 'btn-ghost'
+                            }`}
                           >
-                            <Icon name="pencil" size={14} />
-                            Sửa tour
+                            Lọc hồ sơ cần xử lý
                           </button>
-                        ) : (
-                          <button type="button" onClick={() => setBookingTour(t)} className="btn btn-primary btn-sm">
-                            Xem lịch trình & đặt
-                            <Icon name="arrow-right" size={14} />
+                        </div>
+
+                        <div className="text-sm font-normal text-ink-3">
+                          Bao gồm đơn lịch chuẩn mới, đơn chờ báo giá lại và yêu cầu đổi sau chốt
+                        </div>
+                      </div>
+
+                      {/* Dải 3 chỉ số vận hành bên phải (7 cột) */}
+                      <div className="lg:col-span-7 bg-surface border border-rule rounded-2xl grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-rule overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setLedgerFilter('ALL')}
+                          aria-pressed={ledgerFilter === 'ALL'}
+                          className={`p-5 text-left transition-colors duration-150 cursor-pointer flex flex-col justify-between gap-2 ${
+                            ledgerFilter === 'ALL' ? 'bg-surface-2' : 'hover:bg-surface-2/60'
+                          }`}
+                        >
+                          <span className="text-sm font-medium text-ink-2">
+                            Tổng hồ sơ đặt tour
+                          </span>
+                          <div>
+                            <div className="num tabular-nums text-2xl font-semibold text-ink">
+                              {bookings.length}
+                            </div>
+                            <div className="num text-[13px] font-normal text-ink-3 mt-1">
+                              {tours.length} tour mẫu đang mở
+                            </div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setLedgerFilter('REQUOTED')}
+                          aria-pressed={ledgerFilter === 'REQUOTED'}
+                          className={`p-5 text-left transition-colors duration-150 cursor-pointer flex flex-col justify-between gap-2 ${
+                            ledgerFilter === 'REQUOTED' ? 'bg-surface-2' : 'hover:bg-surface-2/60'
+                          }`}
+                        >
+                          <span className="text-sm font-medium text-ink-2">
+                            Đang chờ khách phản hồi
+                          </span>
+                          <div>
+                            <div className="num tabular-nums text-2xl font-semibold text-ink">
+                              {requotedList.length}
+                            </div>
+                            <div className="text-[13px] font-normal text-ink-3 mt-1">
+                              Đã gửi bảng báo giá
+                            </div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setLedgerFilter('CONFIRMED')}
+                          aria-pressed={ledgerFilter === 'CONFIRMED'}
+                          className={`p-5 text-left transition-colors duration-150 cursor-pointer flex flex-col justify-between gap-2 ${
+                            ledgerFilter === 'CONFIRMED' ? 'bg-surface-2' : 'hover:bg-surface-2/60'
+                          }`}
+                        >
+                          <span className="text-sm font-medium text-ink-2">
+                            Đã chốt &amp; xác nhận
+                          </span>
+                          <div>
+                            <div className="num tabular-nums text-2xl font-semibold text-ink">
+                              {confirmedList.length}
+                            </div>
+                            <div className="num text-[13px] font-normal text-ink-3 mt-1">
+                              {formatVnd(confirmedRevenue)}
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    </section>
+
+                    {/* Hàng đợi được lọc trực tiếp bởi Summary Strip */}
+                    <section className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="font-display !font-semibold text-2xl text-ink">
+                          {ledgerTitle}
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBookingFilter('ALL');
+                            setSection('bookings');
+                          }}
+                          className="btn btn-ghost text-sm font-medium py-2 px-4"
+                        >
+                          <span>Xem tất cả đơn ({bookings.length})</span>
+                          <Icon name="arrow-right" size={16} strokeWidth={1.5} />
+                        </button>
+                      </div>
+
+                      {renderBookingDossierList(
+                        ledgerFilteredBookings,
+                        ledgerFilter === 'ACTION'
+                          ? 'Hiện không có đơn nào đang chờ xử lý'
+                          : ledgerFilter === 'REQUOTED'
+                          ? 'Chưa có đơn nào đang chờ khách duyệt báo giá'
+                          : ledgerFilter === 'ALL'
+                          ? 'Chưa có hồ sơ đặt tour nào'
+                          : 'Chưa có chuyến nào được khách chốt'
+                      )}
+                    </section>
+                  </div>
+                ) : section === 'bookings' ? (
+                  <div className="space-y-5">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <h1 className="font-display !font-semibold text-3xl text-ink">
+                          Điều phối báo giá &amp; lịch trình
+                        </h1>
+                        <p className="text-[15px] font-normal text-ink-2 mt-1">
+                          Điều phối viên phụ trách: {user.fullName} · {filteredBookings.length} hồ sơ đang theo dõi
+                        </p>
+                      </div>
+
+                      <div className="relative w-full sm:w-96">
+                        <Icon
+                          name="search"
+                          size={16}
+                          strokeWidth={1.5}
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none"
+                        />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Tìm mã đơn, tên khách hoặc tour"
+                          aria-label="Tìm mã đơn hoặc tên khách"
+                          className="field pl-10 pr-9 py-2.5 text-[15px]"
+                        />
+                        {searchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            aria-label="Xóa từ khóa tìm kiếm"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-3 hover:text-ink cursor-pointer"
+                          >
+                            <Icon name="x" size={16} strokeWidth={1.5} />
                           </button>
                         )}
                       </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        ) : (
-          /* ============ Danh sách đơn ============ */
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="max-w-2xl">
-                <h1 className="font-head text-4xl font-bold uppercase tracking-wide leading-none">
-                  {isGuide ? 'Đơn đặt & báo giá' : 'Chuyến đi của tôi'}
-                </h1>
-                <p className="mt-2 text-[0.95rem] text-ink-2">
-                  {isGuide
-                    ? `Yêu cầu gửi tới Guide ${currentGuide?.fullName ?? ''}. Mở đơn đang chờ báo giá để điền giá và gửi báo giá chốt.`
-                    : `Các tấm vé của ${currentCustomer?.fullName ?? 'bạn'}. Mở vé để xem tiến trình 4 chặng và so sánh giá trước/sau.`}
-                </p>
-              </div>
-              <button type="button" onClick={refreshData} className="btn btn-ghost btn-sm">
-                <Icon name="refresh" size={14} />
-                Làm mới
-              </button>
-            </div>
+                    </div>
 
-            {loadingList && bookings.length === 0 ? (
-              <div className="space-y-4" aria-busy="true">
-                {[0, 1].map((i) => (
-                  <div key={i} className="h-32 rounded-lg border border-hairline bg-stock animate-pulse" />
-                ))}
-              </div>
-            ) : bookings.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-hairline-strong bg-stock px-6 py-12 text-center">
-                <Icon name="wallet" size={28} className="mx-auto text-ink-3" />
-                <p className="mt-3 font-semibold text-ink">Ví vé đang trống</p>
-                <p className="mt-1 text-sm text-ink-2">
-                  {isGuide
-                    ? 'Khi khách đặt tour của bạn, đơn sẽ xuất hiện ở đây.'
-                    : 'Chọn một tour, giữ nguyên hoặc tuỳ chỉnh lịch trình rồi gửi yêu cầu đặt.'}
-                </p>
-                {!isGuide && (
-                  <button type="button" onClick={() => goTab('tours')} className="btn btn-primary mt-4">
-                    Khám phá tour
-                  </button>
-                )}
-              </div>
-            ) : (
-              <ul className="space-y-4">
-                {bookings.map((b) => {
-                  const badge = statusBadge(b.status);
-                  const priceChanged = b.totalPrice !== b.originalTotalPrice;
-                  const needsMe =
-                    (isGuide && b.status === 'WAITING_REQUOTE') || (!isGuide && b.status === 'REQUOTED');
-                  return (
-                    <li key={b.id}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(
+                        [
+                          { key: 'ALL', label: `Tất cả (${bookings.length})` },
+                          { key: 'ACTION', label: `Cần xử lý (${actionQueue.length})` },
+                          { key: 'REQUOTED', label: `Đã gửi giá (${requotedList.length})` },
+                          { key: 'CONFIRMED', label: `Đã chốt (${confirmedList.length})` },
+                          { key: 'CANCELLED', label: `Đã hủy (${cancelledList.length})` },
+                        ] as { key: BookingFilter; label: string }[]
+                      ).map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          aria-pressed={bookingFilter === item.key}
+                          onClick={() => setBookingFilter(item.key)}
+                          className="chip font-medium"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {renderBookingDossierList(
+                      filteredBookings,
+                      'Không tìm thấy đơn đặt tour khớp bộ lọc hiện tại'
+                    )}
+                  </div>
+                ) : (
+                  /* Quản lý Tour mẫu */
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <h1 className="font-display !font-semibold text-3xl text-ink">
+                          Thư viện lộ trình mẫu &amp; kho ảnh vùng miền
+                        </h1>
+                        <p className="text-[15px] font-normal text-ink-2 mt-1">
+                          Mỗi lần chỉnh sửa sẽ nâng phiên bản (v1 → v2) mà không làm sai lệch đơn khách đã đặt.
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setSelectedBookingId(b.id)}
-                        className={`w-full text-left grid grid-cols-1 sm:grid-cols-[9.5rem_1fr_auto] overflow-hidden rounded-lg border bg-stock shadow-coupon transition-shadow duration-200 hover:shadow-lift cursor-pointer ${
-                          needsMe ? 'border-carbon' : 'border-hairline'
+                        onClick={() => {
+                          setEditingTour(null);
+                          setEditorOpen(true);
+                        }}
+                        className="btn btn-primary text-sm font-medium py-2.5 px-5"
+                      >
+                        <Icon name="plus" size={16} strokeWidth={1.5} />
+                        <span>Tạo tour mẫu mới</span>
+                      </button>
+                    </div>
+
+                    {tours.length === 0 ? (
+                      <div className="flagship-card p-10 text-center space-y-3">
+                        <Icon name="map" size={24} strokeWidth={1.5} className="text-ink-3 mx-auto" />
+                        <div className="text-base font-medium text-ink-2">
+                          Bạn chưa có tour mẫu nào
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTour(null);
+                            setEditorOpen(true);
+                          }}
+                          className="btn btn-primary text-sm font-medium"
+                        >
+                          <Icon name="plus" size={16} strokeWidth={1.5} />
+                          <span>Tạo tour mẫu đầu tiên</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {tours.map((tour) => {
+                          const photoCount = tour.galleryUrls?.length || (tour.imageUrl ? 1 : 0);
+                          return (
+                            <article
+                              key={tour.id}
+                              className="flagship-card transition-colors duration-150 hover:border-rule-strong flex flex-col"
+                            >
+                              <div className="relative aspect-[16/10] overflow-hidden border-b border-rule bg-surface-2">
+                                <SafeImage
+                                  src={tour.imageUrl}
+                                  alt={tour.title}
+                                  className="w-full h-full object-cover"
+                                />
+                                <span className="num absolute top-3 left-3 rounded-lg bg-[#0F172A]/90 text-white px-3 py-1 text-[13px] font-medium">
+                                  v{tour.version} · {tour.days}N
+                                </span>
+                                <span className="num absolute top-3 right-3 rounded-lg bg-black/75 text-white px-2.5 py-1 text-[13px] font-medium inline-flex items-center gap-1.5">
+                                  <Icon name="image" size={14} strokeWidth={1.5} />
+                                  {photoCount} ảnh
+                                </span>
+                              </div>
+
+                              <div className="p-5 flex-1 flex flex-col justify-between gap-2.5">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-2 text-[13px] font-medium text-ink-3">
+                                    <span className="inline-flex items-center gap-1.5 text-indigo">
+                                      <Icon name="map-pin" size={16} strokeWidth={1.5} />
+                                      {tour.regionName}
+                                    </span>
+                                    <span className="num">{tour.steps.length} chặng</span>
+                                  </div>
+                                  <h3 className="font-display !font-semibold text-lg text-ink leading-snug">
+                                    {tour.title}
+                                  </h3>
+                                  <p className="text-sm font-normal text-ink-2 line-clamp-2">
+                                    {tour.description}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="editorial-divider" />
+
+                              <div className="bg-surface-2 px-5 py-3.5 flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-[13px] font-medium text-ink-3">
+                                    Giá chuẩn / khách
+                                  </div>
+                                  <div className="num text-xl font-semibold text-coral mt-0.5">
+                                    {formatVnd(tour.basePricePerPerson)}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingTour(tour);
+                                    setEditorOpen(true);
+                                  }}
+                                  className="btn btn-ghost text-sm font-medium py-2 px-3.5"
+                                >
+                                  <Icon name="edit" size={16} strokeWidth={1.5} />
+                                  <span>Sửa tour</span>
+                                </button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </main>
+            </>
+          )}
+
+          {/* Drawer xem nhanh đơn */}
+          <Drawer
+            isOpen={Boolean(drawerBooking)}
+            onOpenChange={(open) => !open && setDrawerBooking(null)}
+            side="end"
+            width={480}
+            label="Chi tiết nhanh đơn đặt tour"
+          >
+            {drawerBooking && (
+              <Layout
+                height="fill"
+                header={
+                  <DrawerHeader
+                    title={`${drawerBooking.code} · ${drawerBooking.customer.fullName}`}
+                    subtitle={`${drawerBooking.tourTitleSnapshot} (v${drawerBooking.tourVersionSnapshot})`}
+                    onOpenChange={(open) => !open && setDrawerBooking(null)}
+                  />
+                }
+                content={
+                  <div className="p-5 space-y-4 overflow-y-auto bg-canvas">
+                    <div className="bg-surface-2 p-4 rounded-xl border border-rule flex items-center justify-between gap-2">
+                      <span
+                        className={`tag normal-case tracking-normal font-medium ${
+                          statusMeta(drawerBooking.status).tagClass
                         }`}
                       >
-                        <div className="flex sm:flex-col items-center sm:items-start justify-between gap-3 bg-stock-2 px-4 py-4">
-                          <span className="num text-sm font-bold text-ink">{b.code}</span>
-                          <span className={`stamp ${badge.bg}`}>{badge.stamp}</span>
+                        {statusMeta(drawerBooking.status).short}
+                      </span>
+                      <div className="text-right">
+                        <div className="text-[13px] font-medium text-ink-3">Tổng báo giá</div>
+                        <div className="num text-xl font-semibold text-coral">
+                          {formatVnd(drawerBooking.totalPrice)}
                         </div>
+                      </div>
+                    </div>
 
-                        <div className="perf-y min-w-0 px-4 py-4 flex gap-4">
-                          <img
-                            src={b.tour.imageUrl}
-                            alt=""
-                            className="hidden md:block h-20 w-24 shrink-0 rounded object-cover bg-stock-2"
-                          />
-                          <div className="min-w-0 space-y-1">
-                            <p className="font-semibold text-ink leading-snug">{b.tour.title}</p>
-                            <p className="text-xs text-ink-2 flex flex-wrap gap-x-3 gap-y-1">
-                              <span className="inline-flex items-center gap-1"><Icon name="user" size={13} />{b.customer.fullName}</span>
-                              <span className="inline-flex items-center gap-1"><Icon name="compass" size={13} />{b.guide.fullName}</span>
-                              <span className="inline-flex items-center gap-1"><Icon name="calendar" size={13} /><span className="num">{b.startDate}</span></span>
-                              <span className="inline-flex items-center gap-1"><Icon name="users" size={13} /><span className="num">{b.days}</span> ngày · <span className="num">{b.guests}</span> khách</span>
-                            </p>
-                            <p className="text-xs text-ink-3">{badge.text}</p>
-                            {b.customerNote && (
-                              <p className="text-xs text-ink-2 truncate max-w-xl">
-                                <Icon name="message" size={12} className="inline -mt-0.5 mr-1 text-ink-3" />
-                                “{b.customerNote}”
-                              </p>
-                            )}
-                          </div>
+                    <div className="grid grid-cols-3 gap-2.5 text-sm">
+                      <div className="p-3 rounded-xl border border-rule bg-surface">
+                        <div className="text-[13px] font-medium text-ink-3">Khởi hành</div>
+                        <div className="num font-semibold text-ink mt-1">
+                          {drawerBooking.startDate}
                         </div>
+                      </div>
+                      <div className="p-3 rounded-xl border border-rule bg-surface">
+                        <div className="text-[13px] font-medium text-ink-3">Thời lượng</div>
+                        <div className="num font-semibold text-ink mt-1">
+                          {drawerBooking.days} ngày
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-xl border border-rule bg-surface">
+                        <div className="text-[13px] font-medium text-ink-3">Số khách</div>
+                        <div className="num font-semibold text-ink mt-1">
+                          {drawerBooking.guests} khách
+                        </div>
+                      </div>
+                    </div>
 
-                        <div className="perf-x sm:border-t-0 sm:perf-y flex sm:flex-col items-center sm:items-end justify-between gap-2 px-4 py-4 sm:min-w-[12rem]">
-                          <div className="sm:text-right">
-                            {priceChanged && (
-                              <span className="num block text-xs text-ink-3 line-through">{formatVnd(b.originalTotalPrice)}</span>
-                            )}
-                            <span className="num block text-lg font-bold text-carbon">{formatVnd(b.totalPrice)}</span>
-                          </div>
-                          <span className={`inline-flex items-center gap-1 text-xs font-semibold ${needsMe ? 'text-carbon' : 'text-ink-2'}`}>
-                            {needsMe ? (isGuide ? 'Báo giá ngay' : 'Xem báo giá mới') : 'Xem chi tiết'}
-                            <Icon name="arrow-right" size={13} />
-                          </span>
+                    {drawerBooking.customerNote && (
+                      <div className="p-3.5 rounded-xl border border-rule bg-surface text-sm">
+                        <div className="text-[13px] font-medium text-ink-3 mb-1">
+                          Lời nhắn từ khách
                         </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+                        <div className="text-ink font-normal">{drawerBooking.customerNote}</div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <div className="text-[13px] font-medium text-ink-3">
+                        Danh sách chặng ({drawerBooking.steps.length})
+                      </div>
+                      <div className="rounded-xl border border-rule divide-y divide-rule bg-surface overflow-hidden">
+                        {drawerBooking.steps.map((s, idx) => {
+                          const nt = noteTypeMeta(s.noteType);
+                          const isVoid = s.noteType === 'REMOVED';
+                          return (
+                            <div
+                              key={idx}
+                              className={`p-3 flex items-center justify-between gap-2.5 text-sm ${
+                                isVoid ? 'opacity-65 bg-surface-2' : ''
+                              }`}
+                            >
+                              <div className="min-w-0 space-y-1">
+                                <div
+                                  className={`font-medium text-ink truncate ${
+                                    isVoid ? 'line-through' : ''
+                                  }`}
+                                >
+                                  <span className="num text-ink-3 mr-1.5">N{s.dayNumber}</span>
+                                  {s.title}
+                                </div>
+                                <span
+                                  className={`tag normal-case tracking-normal font-medium ${nt.tagClass}`}
+                                >
+                                  {nt.label}
+                                </span>
+                              </div>
+                              <span className="num font-semibold text-coral shrink-0">
+                                {formatVnd(s.pricePerPerson)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                }
+                footer={
+                  <div className="p-4 border-t border-rule bg-surface-2 flex justify-end gap-2.5">
+                    <button
+                      type="button"
+                      className="btn btn-ghost text-sm font-medium"
+                      onClick={() => setDrawerBooking(null)}
+                    >
+                      Đóng
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary text-sm font-medium"
+                      onClick={() => {
+                        const target = drawerBooking;
+                        setDrawerBooking(null);
+                        setSelectedBooking(target);
+                        setSection('bookings');
+                      }}
+                    >
+                      <span>Mở màn hình báo giá</span>
+                      <Icon name="arrow-right" size={16} strokeWidth={1.5} />
+                    </button>
+                  </div>
+                }
+              />
             )}
-          </div>
-        )}
-      </main>
+          </Drawer>
 
-      <footer className="border-t border-hairline">
-        <div className="mx-auto max-w-6xl px-4 py-4 text-xs text-ink-3">
-          TripBuilder · Bản demo đồ án. Dữ liệu tour, Guide và khách hàng là dữ liệu mẫu.
+          {user && editorOpen && (
+            <GuidePresetEditor
+              key={editingTour ? editingTour.id : 'new'}
+              isOpen={editorOpen}
+              guideId={user.id}
+              regions={regions}
+              editingTour={editingTour}
+              onClose={() => {
+                setEditorOpen(false);
+                setEditingTour(null);
+              }}
+              onSaved={(saved, isNew) => {
+                setEditorOpen(false);
+                setEditingTour(null);
+                setTours((prev) =>
+                  isNew ? [saved, ...prev] : prev.map((t) => (t.id === saved.id ? saved : t))
+                );
+              }}
+            />
+          )}
         </div>
-      </footer>
-
-      {bookingTour && currentCustomer && (
-        <CustomerCustomizeModal
-          tour={bookingTour}
-          customer={currentCustomer}
-          onClose={() => setBookingTour(null)}
-          onSubmitted={(createdBooking) => {
-            setBookingTour(null);
-            refreshData();
-            setTab('bookings');
-            setSelectedBookingId(createdBooking.id);
-          }}
-        />
-      )}
-    </div>
+      </LayerProvider>
+    </Theme>
   );
 }

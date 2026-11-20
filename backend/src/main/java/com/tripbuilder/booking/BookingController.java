@@ -1,7 +1,12 @@
 package com.tripbuilder.booking;
 
+import com.tripbuilder.auth.AuthInterceptor;
 import com.tripbuilder.booking.BookingService.*;
 import com.tripbuilder.common.ApiResponse;
+import com.tripbuilder.common.ForbiddenException;
+import com.tripbuilder.user.AppUser;
+import com.tripbuilder.user.Role;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,42 +21,98 @@ public class BookingController {
 
     @GetMapping
     public ApiResponse<List<BookingDto>> list(@RequestParam(required = false) Long customerId,
-                                              @RequestParam(required = false) Long guideId) {
-        return ApiResponse.ok(bookingService.list(customerId, guideId));
+                                              @RequestParam(required = false) Long guideId,
+                                              HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() == Role.CUSTOMER) {
+            if (guideId != null || (customerId != null && !customerId.equals(user.getId()))) {
+                throw new ForbiddenException("Bạn chỉ có thể xem đơn đặt tour của chính mình");
+            }
+            return ApiResponse.ok(bookingService.list(user.getId(), null));
+        }
+        if (customerId != null || (guideId != null && !guideId.equals(user.getId()))) {
+            throw new ForbiddenException("Bạn chỉ có thể xem các đơn thuộc tour của mình");
+        }
+        return ApiResponse.ok(bookingService.list(null, user.getId()));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<BookingDto> get(@PathVariable Long id) {
-        return ApiResponse.ok(bookingService.get(id));
+    public ApiResponse<BookingDto> get(@PathVariable Long id, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        return ApiResponse.ok(bookingService.get(id, user));
     }
 
-    /** Khách đặt tour (nguyên bản hoặc đã chỉnh sửa ngay lúc đặt). */
+    /** Chỉ Khách hàng được tạo đơn đặt tour. */
     @PostMapping
-    public ApiResponse<BookingDto> create(@RequestBody CreateBookingRequest req) {
-        return ApiResponse.ok("Đã đặt tour thành công", bookingService.create(req));
+    public ApiResponse<BookingDto> create(@RequestBody CreateBookingRequest req, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.CUSTOMER) {
+            throw new ForbiddenException("Tài khoản Tour Guide không thể thực hiện đặt tour");
+        }
+        CreateBookingRequest scoped = new CreateBookingRequest(
+                req.tourId(),
+                user.getId(),
+                req.startDate(),
+                req.days(),
+                req.guests(),
+                req.serviceMode(),
+                req.customerNote(),
+                req.customized(),
+                req.steps()
+        );
+        return ApiResponse.ok("Đã gửi yêu cầu đặt tour", bookingService.create(scoped));
     }
 
-    /** Khách chỉnh sửa lại lịch trình theo ý muốn -> Chờ Guide báo giá lại. */
+    /** Khách hàng điều chỉnh lịch trình (kể cả vòng tiếp hoặc xin đổi sau chốt). */
     @PutMapping("/{id}/customize")
-    public ApiResponse<BookingDto> customize(@PathVariable Long id, @RequestBody CustomizeRequest req) {
-        return ApiResponse.ok("Đã gửi yêu cầu chỉnh sửa cho Tour Guide", bookingService.customize(id, req));
+    public ApiResponse<BookingDto> customize(@PathVariable Long id,
+                                             @RequestBody CustomizeRequest req,
+                                             HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.CUSTOMER) {
+            throw new ForbiddenException("Chỉ khách hàng mới được gửi yêu cầu tuỳ chỉnh");
+        }
+        return ApiResponse.ok("Đã gửi điều chỉnh cho Tour Guide", bookingService.customize(id, req, user));
     }
 
-    /** Tour Guide sửa từng dòng giá & gửi Báo giá lại cho khách. */
+    /** Tour Guide kiểm tra & gửi báo giá lại (hỗ trợ cả đơn đã chốt cần điều chỉnh). */
     @PutMapping("/{id}/requote")
-    public ApiResponse<BookingDto> requote(@PathVariable Long id, @RequestBody RequoteRequest req) {
-        return ApiResponse.ok("Đã gửi Báo giá lại cho khách hàng", bookingService.requote(id, req));
+    public ApiResponse<BookingDto> requote(@PathVariable Long id,
+                                           @RequestBody RequoteRequest req,
+                                           HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.GUIDE) {
+            throw new ForbiddenException("Chỉ Tour Guide mới có quyền gửi báo giá");
+        }
+        return ApiResponse.ok("Đã gửi báo giá cho khách hàng", bookingService.requote(id, req, user));
     }
 
-    /** Khách đồng ý chốt báo giá. */
+    /** Khách hàng đồng ý chốt chuyến. */
     @PostMapping("/{id}/confirm")
-    public ApiResponse<BookingDto> confirm(@PathVariable Long id) {
-        return ApiResponse.ok("Đã xác nhận chốt Tour!", bookingService.confirm(id));
+    public ApiResponse<BookingDto> confirm(@PathVariable Long id, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.CUSTOMER) {
+            throw new ForbiddenException("Chỉ khách hàng mới có quyền chốt chuyến");
+        }
+        return ApiResponse.ok("Đã chốt lịch trình chuyến đi!", bookingService.confirm(id, user));
     }
 
-    /** Huỷ đơn. */
+    /** Khách hàng hoặc Guide sở hữu đơn có thể huỷ đơn. */
     @PostMapping("/{id}/cancel")
-    public ApiResponse<BookingDto> cancel(@PathVariable Long id) {
-        return ApiResponse.ok("Đã huỷ đơn đặt tour", bookingService.cancel(id));
+    public ApiResponse<BookingDto> cancel(@PathVariable Long id, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        return ApiResponse.ok("Đã huỷ đơn đặt tour", bookingService.cancel(id, user));
+    }
+
+    /** Khách đánh giá sau khi chốt/hoàn thành chuyến đi. */
+    @PostMapping("/{id}/review")
+    public ApiResponse<BookingDto> review(@PathVariable Long id,
+                                          @RequestBody ReviewRequest req,
+                                          HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.CUSTOMER) {
+            throw new ForbiddenException("Chỉ khách hàng mới có quyền gửi đánh giá");
+        }
+        return ApiResponse.ok("Đã gửi đánh giá chuyến đi", bookingService.review(id, req, user));
     }
 }

@@ -1,399 +1,871 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
 import {
   createTour,
+  DEFAULT_TRAVEL_IMAGE,
   formatVnd,
   getOptionsByRegion,
-  getRegions,
   updateTour,
   type PresetOption,
   type Region,
   type Tour,
   type TourStep,
 } from '../api';
-import Icon from './Icon';
+import { categoryIconName, Icon } from './Icon';
+import { RegionPhotoPicker } from './RegionPhotoPicker';
+import { SafeImage } from './SafeImage';
 
-interface Props {
+interface GuidePresetEditorProps {
+  isOpen: boolean;
   guideId: number;
-  guideName: string;
-  /** Nếu truyền initialTour vào -> chế độ Chỉnh sửa Tour Preset đã đăng. */
-  initialTour?: Tour | null;
-  onCancel: () => void;
-  onSaved: (tour: Tour) => void;
+  regions: Region[];
+  editingTour?: Tour | null;
+  onClose: () => void;
+  onSaved: (tour: Tour, isNew: boolean) => void;
 }
 
-const CATEGORIES = ['Di chuyển', 'Khách sạn', 'Trải nghiệm', 'Ăn uống'];
+interface DraftTourStep extends TourStep {
+  _key: string;
+}
 
-export default function GuidePresetEditor({
+const CATEGORIES = ['Di chuyển', 'Khách sạn', 'Ăn uống', 'Trải nghiệm', 'Yêu cầu thêm'];
+
+function categoryBadgeClass(category: string): string {
+  switch (category) {
+    case 'Khách sạn':
+      return 'category-badge-hotel';
+    case 'Ăn uống':
+      return 'category-badge-food';
+    case 'Di chuyển':
+      return 'category-badge-transport';
+    case 'Trải nghiệm':
+      return 'category-badge-activity';
+    default:
+      return 'category-badge-custom';
+  }
+}
+
+function makeDraftKey(prefix = 'ts'): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export function GuidePresetEditor({
+  isOpen,
   guideId,
-  guideName,
-  initialTour,
-  onCancel,
+  regions,
+  editingTour,
+  onClose,
   onSaved,
-}: Props) {
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [regionId, setRegionId] = useState<number>(initialTour?.regionId || 0);
-  const [options, setOptions] = useState<PresetOption[]>([]);
+}: GuidePresetEditorProps) {
+  const isEdit = Boolean(editingTour);
+  const defaultRegionCover = regions[0]?.imageUrl || DEFAULT_TRAVEL_IMAGE;
 
-  const [title, setTitle] = useState(initialTour?.title || '');
-  const [days, setDays] = useState(initialTour?.days || 2);
-  const [description, setDescription] = useState(initialTour?.description || '');
-  const [imageUrl, setImageUrl] = useState(initialTour?.imageUrl || '');
-  const [steps, setSteps] = useState<TourStep[]>(
-    initialTour?.steps.map((s) => ({ ...s })) || [
-      { dayNumber: 1, category: 'Di chuyển', title: 'Xe đón đoàn & Guide bản địa đồng hành', pricePerPerson: 400000 },
-      { dayNumber: 1, category: 'Khách sạn', title: 'Nhận phòng khách sạn nghỉ ngơi', pricePerPerson: 700000 },
-      { dayNumber: 2, category: 'Trải nghiệm', title: 'Tham quan các điểm nổi bật & thưởng thức đặc sản', pricePerPerson: 500000 },
-    ]
+  const [regionId, setRegionId] = useState(
+    String(editingTour?.regionId || regions[0]?.id || 1)
+  );
+  const [title, setTitle] = useState(editingTour?.title || '');
+  const [description, setDescription] = useState(editingTour?.description || '');
+  const [days, setDays] = useState(editingTour?.days || 3);
+
+  const [imageUrl, setImageUrl] = useState(
+    editingTour?.imageUrl || defaultRegionCover
   );
 
-  const [submitting, setSubmitting] = useState(false);
+  const [galleryUrls, setGalleryUrls] = useState<string[]>(() => {
+    if (editingTour?.galleryUrls?.length) {
+      return Array.from(new Set(editingTour.galleryUrls.filter(Boolean)));
+    }
+    const seed = editingTour?.imageUrl || defaultRegionCover;
+    return seed ? [seed] : [];
+  });
+
+  const [showExternalUrlInput, setShowExternalUrlInput] = useState(false);
+  const [externalUrlDraft, setExternalUrlDraft] = useState('');
+  const [pickingStepKey, setPickingStepKey] = useState<string | null>(null);
+
+  const [steps, setSteps] = useState<DraftTourStep[]>(() =>
+    editingTour
+      ? editingTour.steps.map((s, idx) => ({ ...s, _key: `srv-${s.id ?? idx}-${idx}` }))
+      : [
+          {
+            _key: makeDraftKey('init1'),
+            dayNumber: 1,
+            category: 'Di chuyển',
+            title: 'Xe đón đoàn tại điểm hẹn',
+            imageUrl: '/images/activities/01-limousine-van.jpg',
+            pricePerPerson: 350_000,
+          },
+          {
+            _key: makeDraftKey('init2'),
+            dayNumber: 1,
+            category: 'Khách sạn',
+            title: 'Khách sạn trung tâm 4★ (2 đêm)',
+            imageUrl: '/images/activities/05-resort-spa.jpg',
+            pricePerPerson: 900_000,
+          },
+        ]
+  );
+
+  const [pendingDayShrink, setPendingDayShrink] = useState<number | null>(null);
+  const [options, setOptions] = useState<PresetOption[]>([]);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getRegions()
-      .then((list) => {
-        setRegions(list);
-        if (!regionId && list.length > 0) {
-          setRegionId(list[0].id);
-        }
-      })
-      .catch(() => setRegions([]));
-  }, []);
-
-  useEffect(() => {
-    if (!regionId) return;
-    getOptionsByRegion(regionId)
+    const numRegion = Number(regionId);
+    if (!numRegion) return;
+    getOptionsByRegion(numRegion)
       .then(setOptions)
       .catch(() => setOptions([]));
   }, [regionId]);
 
-  const basePricePerPerson = steps
-    .filter((s) => s.dayNumber <= days)
-    .reduce((sum, s) => sum + (Number(s.pricePerPerson) || 0), 0);
-  const dayNumbers = Array.from({ length: days }, (_, i) => i + 1);
+  const basePrice = useMemo(
+    () => steps.reduce((acc, s) => acc + (Number(s.pricePerPerson) || 0), 0),
+    [steps]
+  );
 
-  const addBlankStep = (dayNumber: number) => {
-    setSteps((prev) => [
-      ...prev,
-      { dayNumber, category: 'Trải nghiệm', title: '', pricePerPerson: 300000 },
-    ]);
+  const handleToggleGalleryUrl = (url: string) => {
+    setGalleryUrls((prev) => {
+      if (prev.includes(url)) {
+        const next = prev.filter((item) => item !== url);
+        if (imageUrl === url) {
+          setImageUrl(next[0] || DEFAULT_TRAVEL_IMAGE);
+        }
+        return next;
+      }
+      const next = [...prev, url];
+      if (!imageUrl || imageUrl === DEFAULT_TRAVEL_IMAGE) {
+        setImageUrl(url);
+      }
+      return next;
+    });
   };
 
-  const addOptionStep = (dayNumber: number, opt: PresetOption) => {
+  const handleBatchAddGalleryUrls = (urls: string[]) => {
+    setGalleryUrls((prev) => {
+      const merged = Array.from(new Set([...prev, ...urls.filter(Boolean)]));
+      if ((!imageUrl || imageUrl === DEFAULT_TRAVEL_IMAGE) && merged[0]) {
+        setImageUrl(merged[0]);
+      }
+      return merged;
+    });
+  };
+
+  const handleMoveGalleryUrl = (index: number, direction: -1 | 1) => {
+    setGalleryUrls((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved);
+      return next;
+    });
+  };
+
+  const handleRemoveGalleryUrl = (url: string) => {
+    setGalleryUrls((prev) => {
+      const next = prev.filter((item) => item !== url);
+      if (imageUrl === url) {
+        setImageUrl(next[0] || DEFAULT_TRAVEL_IMAGE);
+      }
+      return next;
+    });
+  };
+
+  const handleAddExternalUrl = () => {
+    const clean = externalUrlDraft.trim();
+    if (!clean) return;
+    setGalleryUrls((prev) => (prev.includes(clean) ? prev : [...prev, clean]));
+    if (!imageUrl) {
+      setImageUrl(clean);
+    }
+    setExternalUrlDraft('');
+    setShowExternalUrlInput(false);
+  };
+
+  const updateStepByKey = (key: string, patch: Partial<DraftTourStep>) => {
+    setSteps((prev) => prev.map((s) => (s._key === key ? { ...s, ...patch } : s)));
+  };
+
+  const removeStepByKey = (key: string) => {
+    setSteps((prev) => prev.filter((s) => s._key !== key));
+    if (pickingStepKey === key) setPickingStepKey(null);
+  };
+
+  const addBlankStepForDay = (dayNumber: number) => {
     setSteps((prev) => [
       ...prev,
       {
+        _key: makeDraftKey('blank'),
+        dayNumber,
+        category: 'Trải nghiệm',
+        title: `Hoạt động Ngày ${dayNumber}`,
+        imageUrl,
+        pricePerPerson: 300_000,
+      },
+    ]);
+  };
+
+  const addOptionStepForDay = (dayNumber: number, optIdStr: string) => {
+    const opt = options.find((o) => String(o.id) === optIdStr);
+    if (!opt) return;
+    setSteps((prev) => [
+      ...prev,
+      {
+        _key: makeDraftKey('opt'),
         dayNumber,
         category: opt.category,
         title: opt.title,
+        imageUrl: opt.imageUrl || imageUrl,
         pricePerPerson: opt.pricePerPerson,
       },
     ]);
   };
 
-  const updateStep = (idx: number, patch: Partial<TourStep>) => {
-    setSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  const handleRequestDaysChange = (nextDays: number) => {
+    const clamped = Math.min(10, Math.max(1, nextDays));
+    if (clamped < days && steps.some((s) => s.dayNumber > clamped)) {
+      setPendingDayShrink(clamped);
+      return;
+    }
+    setPendingDayShrink(null);
+    setDays(clamped);
   };
 
-  const removeStep = (idx: number) => {
-    setSteps((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSubmitting(true);
-    try {
-      const validSteps = steps.filter((s) => s.dayNumber <= days && s.title.trim().length > 0);
-      if (validSteps.length === 0) {
-        throw new Error('Tour cần có ít nhất 1 hoạt động hợp lệ.');
+  const applyDayShrink = (strategy: 'merge' | 'drop') => {
+    if (pendingDayShrink == null) return;
+    const nextDays = pendingDayShrink;
+    setSteps((prev) => {
+      if (strategy === 'drop') {
+        return prev.filter((s) => s.dayNumber <= nextDays);
       }
+      return prev.map((s) =>
+        s.dayNumber > nextDays ? { ...s, dayNumber: nextDays } : s
+      );
+    });
+    setDays(nextDays);
+    setPendingDayShrink(null);
+  };
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      setError('Vui lòng nhập tên tour mẫu');
+      return;
+    }
+    if (steps.length === 0) {
+      setError('Tour cần có ít nhất 1 hạng mục');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const normalizedCover =
+        imageUrl.trim() || galleryUrls[0] || regions[0]?.imageUrl || DEFAULT_TRAVEL_IMAGE;
+      const normalizedGallery = galleryUrls.length > 0 ? galleryUrls : [normalizedCover];
+
+      const cleanSteps: TourStep[] = steps.map((s) => ({
+        id: s.id,
+        dayNumber: Math.min(Math.max(1, Number(s.dayNumber) || 1), days),
+        category: s.category,
+        title: s.title.trim() || 'Hoạt động tour',
+        imageUrl: s.imageUrl || normalizedCover,
+        pricePerPerson: Math.max(0, Number(s.pricePerPerson) || 0),
+      }));
+
       const payload = {
         guideId,
-        regionId,
-        title,
-        description,
-        imageUrl,
+        regionId: Number(regionId),
+        title: title.trim(),
+        description:
+          description.trim() || 'Lịch trình bản địa do Tour Guide trực tiếp thiết kế.',
+        imageUrl: normalizedCover,
+        galleryUrls: normalizedGallery,
         days,
-        steps: validSteps,
+        steps: cleanSteps,
       };
-      const saved = initialTour
-        ? await updateTour(initialTour.id, payload)
-        : await createTour(payload);
-      onSaved(saved);
-    } catch (err) {
-      setError((err as Error).message);
+
+      const saved =
+        isEdit && editingTour
+          ? await updateTour(editingTour.id, payload)
+          : await createTour(payload);
+      onSaved(saved, !isEdit);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể lưu tour');
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
+  const affectedLastDayStepsCount =
+    pendingDayShrink != null
+      ? steps.filter((s) => s.dayNumber > pendingDayShrink).length
+      : 0;
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-lg border border-hairline bg-stock shadow-coupon overflow-hidden"
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      width={1060}
+      maxHeight="90dvh"
+      purpose="form"
     >
-      <div className="bg-navy text-navy-ink px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <span className="coupon-head text-[0.72rem] text-[#f2c14e]">
-            {initialTour ? 'Cập nhật lịch trình chuẩn' : 'Soạn tour mới'} · Guide {guideName}
-          </span>
-          <h1 className="font-head text-2xl font-bold uppercase tracking-wide text-white mt-0.5">
-            {initialTour ? initialTour.title : 'Thiết kế Tour mới'}
-          </h1>
+      <div className="flex flex-col max-h-[86dvh] min-h-0 overflow-hidden bg-surface">
+        <div className="shrink-0">
+          <DialogHeader
+            title={isEdit ? `Chỉnh sửa tour mẫu · v${editingTour?.version}` : 'Tạo tour mẫu mới'}
+            subtitle={
+              isEdit
+                ? 'Lưu sẽ nâng phiên bản tour, các đơn khách đã đặt vẫn giữ nguyên bản chụp cũ'
+                : 'Thiết kế lịch trình chuẩn theo từng ngày để khách đặt ngay hoặc tùy chỉnh'
+            }
+            onOpenChange={(open) => !open && onClose()}
+          />
         </div>
 
-        <button
-          type="button"
-          onClick={onCancel}
-          className="btn btn-sm border-white/20 bg-white/10 text-white hover:bg-white/20"
-        >
-          <Icon name="x" size={14} />
-          Đóng
-        </button>
-      </div>
-
-      <div className="p-5 space-y-6">
-        {error && (
-          <div role="alert" className="rounded-md border border-red/40 bg-red-soft px-4 py-3 text-sm text-ink flex items-center gap-2">
-            <Icon name="alert" size={16} className="text-red" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-          <div className="sm:col-span-2">
-            <label htmlFor="tour-title" className="block font-semibold text-ink mb-1">
-              Tên tour *
-            </label>
-            <input
-              id="tour-title"
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="VD: Hạ Long 2N1Đ — Khám phá Vịnh & Chèo Kayak"
-              className="field"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="tour-region" className="block font-semibold text-ink mb-1">
-                Khu vực *
-              </label>
-              <select
-                id="tour-region"
-                value={regionId}
-                onChange={(e) => setRegionId(Number(e.target.value))}
-                className="field"
-              >
-                {regions.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+        <div className="flex-1 min-h-0 p-5 space-y-5 overflow-y-auto bg-canvas">
+          {error && (
+            <div
+              role="alert"
+              className="rounded-xl border border-crimson bg-crimson-soft px-4 py-3 flex items-start gap-3 text-base text-crimson"
+            >
+              <Icon name="alert" size={18} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold">Không thể lưu tour</div>
+                <div className="text-sm font-normal">{error}</div>
+              </div>
             </div>
+          )}
 
-            <div>
-              <label htmlFor="tour-days" className="block font-semibold text-ink mb-1">
-                Số ngày *
-              </label>
-              <input
-                id="tour-days"
-                type="number"
-                min={1}
-                max={7}
-                required
-                value={days}
-                onChange={(e) => setDays(Math.max(1, Number(e.target.value) || 1))}
-                className="field num"
-              />
-            </div>
-          </div>
+          {/* Thông tin cơ bản tour mẫu */}
+          <section className="flagship-card p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+              <div className="sm:col-span-6 space-y-1.5">
+                <label htmlFor="tour-title" className="block text-sm font-medium text-ink-2">
+                  Tên tour mẫu <span className="text-crimson">*</span>
+                </label>
+                <input
+                  id="tour-title"
+                  type="text"
+                  placeholder="Ví dụ: Đà Lạt săn mây 3N2Đ"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="field text-base font-medium"
+                />
+              </div>
 
-          <div className="sm:col-span-2">
-            <label htmlFor="tour-desc" className="block font-semibold text-ink mb-1">
-              Mô tả ngắn về chuyến đi
-            </label>
-            <input
-              id="tour-desc"
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Giới thiệu điểm hấp dẫn nhất của lịch trình này..."
-              className="field"
-            />
-          </div>
+              <div className="sm:col-span-3 space-y-1.5">
+                <label htmlFor="tour-region" className="block text-sm font-medium text-ink-2">
+                  Điểm đến
+                </label>
+                <select
+                  id="tour-region"
+                  value={regionId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRegionId(val);
+                    const reg = regions.find((r) => String(r.id) === val);
+                    if (reg && !isEdit) {
+                      setImageUrl(reg.imageUrl);
+                      setGalleryUrls((prev) =>
+                        prev.includes(reg.imageUrl) ? prev : [reg.imageUrl, ...prev]
+                      );
+                    }
+                  }}
+                  className="field text-[15px] font-medium"
+                >
+                  {regions.map((r) => (
+                    <option key={r.id} value={String(r.id)}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div>
-            <label htmlFor="tour-img" className="block font-semibold text-ink mb-1">
-              Ảnh bìa (trống = tự lấy ảnh vùng)
-            </label>
-            <input
-              id="tour-img"
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/..."
-              className="field num text-xs"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <h2 className="font-head text-xl font-bold uppercase tracking-wide text-ink">
-              Các coupon hoạt động theo ngày
-            </h2>
-            <span className="text-xs text-ink-3">
-              Nhập đơn giá mỗi khách trên từng dòng để hệ thống tự cộng tổng giá chuẩn.
-            </span>
-          </div>
-
-          {dayNumbers.map((day) => {
-            const daySteps = steps
-              .map((s, idx) => ({ ...s, idx }))
-              .filter((s) => s.dayNumber === day);
-
-            return (
-              <section
-                key={day}
-                aria-label={`Thiết kế ngày ${day}`}
-                className="rounded-lg border border-hairline bg-stock-2/60 overflow-hidden"
-              >
-                <div className="bg-stock-2 px-4 py-2.5 border-b border-hairline flex flex-wrap items-center justify-between gap-2">
-                  <span className="coupon-head text-sm text-ink">Coupon ngày {day}</span>
+              <div className="sm:col-span-3 space-y-1.5">
+                <span className="block text-sm font-medium text-ink-2">Số ngày</span>
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => addBlankStep(day)}
-                    className="btn btn-ghost btn-sm"
+                    disabled={days <= 1}
+                    onClick={() => handleRequestDaysChange(days - 1)}
+                    aria-label="Giảm số ngày"
+                    className="btn btn-ghost px-3 py-2 text-sm font-medium"
                   >
-                    <Icon name="plus" size={14} />
-                    Tự gõ thêm dòng vào Ngày {day}
+                    <Icon name="minus" size={16} strokeWidth={1.5} />
+                  </button>
+                  <span className="num flex-1 text-center text-lg font-semibold text-ink">
+                    {days}N
+                  </span>
+                  <button
+                    type="button"
+                    disabled={days >= 10}
+                    onClick={() => handleRequestDaysChange(days + 1)}
+                    aria-label="Tăng số ngày"
+                    className="btn btn-ghost px-3 py-2 text-sm font-medium"
+                  >
+                    <Icon name="plus" size={16} strokeWidth={1.5} />
                   </button>
                 </div>
+              </div>
+            </div>
 
-                {options.length > 0 && (
-                  <div className="px-4 py-2.5 border-b border-hairline flex flex-wrap items-center gap-1.5">
-                    <span className="coupon-head text-[0.7rem] text-ink-3 mr-1">Chèn nhanh:</span>
-                    {options.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => addOptionStep(day, opt)}
-                        className="chip"
-                      >
-                        <Icon name="plus" size={12} />
-                        {opt.title}
-                        <span className="num text-xs text-carbon">{formatVnd(opt.pricePerPerson)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {pendingDayShrink != null && (
+              <div className="p-3.5 rounded-xl border border-amber bg-amber-soft text-sm flex flex-wrap items-center justify-between gap-2.5">
+                <div className="font-medium text-amber">
+                  Ngày cuối đang có {affectedLastDayStepsCount} hoạt động. Giảm xuống{' '}
+                  {pendingDayShrink} ngày sẽ gộp hoặc xóa các hoạt động đó
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyDayShrink('merge')}
+                    className="btn btn-primary text-sm font-medium py-1.5 px-3"
+                  >
+                    Gộp về Ngày {pendingDayShrink}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyDayShrink('drop')}
+                    className="btn btn-danger text-sm font-medium py-1.5 px-3"
+                  >
+                    Xóa các chặng dư
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDayShrink(null)}
+                    className="btn btn-ghost text-sm font-medium py-1.5 px-3"
+                  >
+                    Giữ nguyên
+                  </button>
+                </div>
+              </div>
+            )}
 
-                {daySteps.length === 0 ? (
-                  <p className="px-4 py-4 text-xs text-ink-3">
-                    Chưa có hoạt động nào trong Ngày {day}. Bấm chèn nhanh hoặc tự gõ thêm dòng.
-                  </p>
-                ) : (
-                  <div className="divide-y divide-hairline bg-stock">
-                    {daySteps.map((st) => (
+            <div className="space-y-1.5">
+              <label htmlFor="tour-desc" className="block text-sm font-medium text-ink-2">
+                Mô tả ngắn gọn
+              </label>
+              <textarea
+                id="tour-desc"
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Tóm tắt điểm nhấn của hành trình"
+                className="field text-[15px]"
+              />
+            </div>
+          </section>
+
+          {/* Visual Multi-Photo Gallery Manager */}
+          <section className="flagship-card overflow-hidden">
+            <div className="bg-surface-2 px-5 py-3.5 border-b border-rule flex flex-wrap items-center justify-between gap-2.5">
+              <div>
+                <div className="text-sm font-semibold text-ink">
+                  Bộ ảnh trưng bày &amp; Ảnh bìa tour
+                </div>
+                <p className="text-sm font-normal text-ink-3 mt-0.5">
+                  Chọn nhiều ảnh thực tế từ kho vùng, bấm Đặt bìa hoặc sắp xếp thứ tự hiển thị
+                </p>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className="num text-sm font-medium text-ink-2">
+                  {galleryUrls.length} ảnh đã chọn
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowExternalUrlInput((v) => !v)}
+                  className="btn btn-ghost text-[13px] font-medium py-1.5 px-3"
+                >
+                  <Icon name="plus" size={16} strokeWidth={1.5} />
+                  <span>Dán URL ảnh ngoài</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {showExternalUrlInput && (
+                <div className="flex flex-wrap items-center gap-2.5 p-3 rounded-xl border border-rule bg-surface-2">
+                  <input
+                    type="text"
+                    value={externalUrlDraft}
+                    onChange={(e) => setExternalUrlDraft(e.target.value)}
+                    placeholder="Dán đường dẫn ảnh (https://... hoặc /images/...)"
+                    className="field flex-1 min-w-[240px] py-2 text-[15px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddExternalUrl}
+                    className="btn btn-primary text-sm font-medium py-2 px-4"
+                  >
+                    Thêm vào thư viện
+                  </button>
+                </div>
+              )}
+
+              {galleryUrls.length === 0 ? (
+                <div className="p-5 rounded-xl border border-dashed border-rule-strong bg-surface-2 text-center text-sm font-normal text-ink-3">
+                  Chưa có ảnh trong bộ sưu tập, chọn ảnh từ kho vùng bên dưới để thêm
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                  {galleryUrls.map((url, idx) => {
+                    const isCover = url === imageUrl;
+                    return (
                       <div
-                        key={st.idx}
-                        className="px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-2.5"
+                        key={`${url}-${idx}`}
+                        className={`rounded-xl border overflow-hidden bg-surface flex flex-col ${
+                          isCover ? 'border-coral ring-2 ring-coral/30' : 'border-rule'
+                        }`}
                       >
-                        <label className="sr-only" htmlFor={`preset-cat-${st.idx}`}>Danh mục</label>
-                        <select
-                          id={`preset-cat-${st.idx}`}
-                          value={st.category}
-                          onChange={(e) => updateStep(st.idx, { category: e.target.value })}
-                          className="field w-auto py-1.5 text-xs font-medium shrink-0"
-                        >
-                          {CATEGORIES.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-
-                        <label className="sr-only" htmlFor={`preset-title-${st.idx}`}>Nội dung hoạt động</label>
-                        <input
-                          id={`preset-title-${st.idx}`}
-                          type="text"
-                          required
-                          value={st.title}
-                          onChange={(e) => updateStep(st.idx, { title: e.target.value })}
-                          placeholder="Nhập nội dung hoạt động / khách sạn / xe / ăn uống..."
-                          className="field flex-1 min-w-[200px] py-1.5 text-sm"
-                        />
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <label className="sr-only" htmlFor={`preset-price-${st.idx}`}>Đơn giá mỗi khách</label>
-                          <input
-                            id={`preset-price-${st.idx}`}
-                            type="number"
-                            step={50000}
-                            min={0}
-                            value={st.pricePerPerson}
-                            onChange={(e) =>
-                              updateStep(st.idx, { pricePerPerson: Number(e.target.value) || 0 })
-                            }
-                            className="field num w-32 py-1.5 text-right font-bold text-carbon"
+                        <div className="relative aspect-[4/3] bg-surface-2 overflow-hidden">
+                          <SafeImage
+                            src={url}
+                            alt={`Ảnh gallery ${idx + 1}`}
+                            className="w-full h-full object-cover"
                           />
-                          <span className="text-xs text-ink-3">đ/khách</span>
+                          <span className="num absolute top-2 left-2 rounded-md bg-black/75 text-white px-2 py-0.5 text-[13px] font-semibold">
+                            #{idx + 1}
+                          </span>
+                          {isCover && (
+                            <span className="rounded-md bg-coral text-white absolute top-2 right-2 text-[13px] font-medium py-0.5 px-2">
+                              Ảnh bìa
+                            </span>
+                          )}
                         </div>
+
+                        <div className="p-2 border-t border-rule bg-surface-2 flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveGalleryUrl(idx, -1)}
+                              title="Di chuyển sang trái"
+                              aria-label="Di chuyển ảnh sang trái"
+                              className="h-7 w-7 rounded-lg border border-rule bg-surface text-ink-2 hover:text-ink disabled:opacity-40 flex items-center justify-center cursor-pointer transition-colors duration-150"
+                            >
+                              <Icon name="chevron-left" size={16} strokeWidth={1.5} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === galleryUrls.length - 1}
+                              onClick={() => handleMoveGalleryUrl(idx, 1)}
+                              title="Di chuyển sang phải"
+                              aria-label="Di chuyển ảnh sang phải"
+                              className="h-7 w-7 rounded-lg border border-rule bg-surface text-ink-2 hover:text-ink disabled:opacity-40 flex items-center justify-center cursor-pointer transition-colors duration-150"
+                            >
+                              <Icon name="chevron-right" size={16} strokeWidth={1.5} />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {!isCover && (
+                              <button
+                                type="button"
+                                onClick={() => setImageUrl(url)}
+                                className="text-[13px] font-medium text-coral hover:underline px-1 cursor-pointer"
+                              >
+                                Đặt bìa
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveGalleryUrl(url)}
+                              title="Xóa ảnh"
+                              aria-label="Xóa ảnh khỏi gallery"
+                              className="h-7 w-7 rounded-lg text-crimson hover:bg-crimson-soft flex items-center justify-center cursor-pointer transition-colors duration-150"
+                            >
+                              <Icon name="x" size={16} strokeWidth={1.5} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="editorial-divider pt-4">
+                <div className="text-sm font-medium text-ink-2 mb-2.5">
+                  Kho ảnh thực tế theo điểm đến
+                </div>
+                <RegionPhotoPicker
+                  regionId={Number(regionId)}
+                  selectedUrls={galleryUrls}
+                  onToggleUrl={handleToggleGalleryUrl}
+                  onBatchAddUrls={handleBatchAddGalleryUrls}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Gom các chặng theo từng Ngày 01..0N */}
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <div>
+                <h3 className="font-display text-xl font-semibold text-ink">
+                  Lịch trình theo ngày ({steps.length} chặng)
+                </h3>
+                <p className="text-sm font-normal text-ink-2 mt-0.5">
+                  Chèn dịch vụ từ kho vùng hoặc thêm hoạt động mới, bấm vào ảnh thu nhỏ để chọn ảnh riêng
+                </p>
+              </div>
+              <span className="num text-base font-semibold text-coral px-3.5 py-1.5 rounded-xl border border-rule bg-surface">
+                {formatVnd(basePrice)} / khách
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {Array.from({ length: days }, (_, i) => i + 1).map((dayNum) => {
+                const daySteps = steps.filter((s) => s.dayNumber === dayNum);
+                const dayTotal = daySteps.reduce(
+                  (acc, s) => acc + (Number(s.pricePerPerson) || 0),
+                  0
+                );
+
+                return (
+                  <section key={dayNum} className="flagship-card">
+                    <div className="bg-flagship-dark text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="font-display text-lg sm:text-xl font-semibold rounded-lg bg-coral text-white px-3 py-1 leading-none">
+                          Ngày {String(dayNum).padStart(2, '0')}
+                        </span>
+                        <span className="num text-sm font-medium text-slate-300">
+                          {daySteps.length} hạng mục
+                        </span>
+                        <span className="num text-base font-semibold text-rose-300">
+                          {formatVnd(dayTotal)}/khách
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {options.length > 0 && (
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                addOptionStepForDay(dayNum, e.target.value);
+                              }
+                            }}
+                            aria-label={`Chọn từ kho vùng vào Ngày ${dayNum}`}
+                            className="field py-1.5 px-3 text-sm font-medium w-64 bg-white text-[#0F172A]"
+                          >
+                            <option value="">
+                              + Chọn từ kho vùng vào Ngày {dayNum}
+                            </option>
+                            {options.map((o) => (
+                              <option key={o.id} value={String(o.id)}>
+                                [{o.category}] {o.title} ({formatVnd(o.pricePerPerson)})
+                              </option>
+                            ))}
+                          </select>
+                        )}
 
                         <button
                           type="button"
-                          onClick={() => removeStep(st.idx)}
-                          aria-label="Xoá dòng này"
-                          className="btn btn-danger btn-sm"
+                          onClick={() => addBlankStepForDay(dayNum)}
+                          className="btn bg-white/15 hover:bg-white/25 text-white border border-white/25 text-sm font-medium py-1.5 px-3"
                         >
-                          <Icon name="x" size={13} />
+                          <Icon name="plus" size={16} strokeWidth={1.5} />
+                          <span>Thêm hoạt động Ngày {dayNum}</span>
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            );
-          })}
+                    </div>
+
+                    {daySteps.length === 0 ? (
+                      <div className="p-5 text-center text-sm font-normal text-ink-3">
+                        Ngày {dayNum} chưa có chặng nào
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-rule">
+                        {daySteps.map((s) => {
+                          const isPickingPhoto = pickingStepKey === s._key;
+                          return (
+                            <div key={s._key} className="p-3.5 space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                                {/* Thumbnail + Category Dot */}
+                                <div className="sm:col-span-2 flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setPickingStepKey((cur) => (cur === s._key ? null : s._key))
+                                    }
+                                    title="Đổi ảnh cho chặng này"
+                                    className={`relative w-14 h-10 rounded-lg overflow-hidden border shrink-0 cursor-pointer group transition-colors duration-150 ${
+                                      isPickingPhoto
+                                        ? 'border-coral ring-2 ring-coral/30'
+                                        : 'border-rule hover:border-coral'
+                                    }`}
+                                  >
+                                    <SafeImage
+                                      src={s.imageUrl || imageUrl}
+                                      alt={s.title}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center text-white">
+                                      <Icon name="camera" size={16} strokeWidth={1.5} />
+                                    </span>
+                                  </button>
+                                  <span
+                                    title={s.category}
+                                    className={`h-9 px-2.5 rounded-lg inline-flex items-center shrink-0 ${categoryBadgeClass(
+                                      s.category
+                                    )}`}
+                                  >
+                                    <Icon name={categoryIconName(s.category)} size={16} strokeWidth={1.5} />
+                                  </span>
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <select
+                                    aria-label="Ngày"
+                                    value={s.dayNumber}
+                                    onChange={(e) =>
+                                      updateStepByKey(s._key, {
+                                        dayNumber: Number(e.target.value) || 1,
+                                      })
+                                    }
+                                    className="field py-2 text-sm font-medium"
+                                  >
+                                    {Array.from({ length: days }, (_, idx) => (
+                                      <option key={idx + 1} value={idx + 1}>
+                                        Ngày {idx + 1}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <select
+                                    aria-label="Nhóm dịch vụ"
+                                    value={s.category}
+                                    onChange={(e) =>
+                                      updateStepByKey(s._key, { category: e.target.value })
+                                    }
+                                    className="field py-2 text-sm font-medium"
+                                  >
+                                    {CATEGORIES.map((c) => (
+                                      <option key={c} value={c}>
+                                        {c}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="sm:col-span-3">
+                                  <input
+                                    type="text"
+                                    aria-label="Tên dịch vụ"
+                                    value={s.title}
+                                    onChange={(e) =>
+                                      updateStepByKey(s._key, { title: e.target.value })
+                                    }
+                                    className="field py-2 text-[15px] font-medium"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <input
+                                    type="number"
+                                    step={50_000}
+                                    min={0}
+                                    aria-label="Đơn giá / khách"
+                                    value={s.pricePerPerson}
+                                    onChange={(e) =>
+                                      updateStepByKey(s._key, {
+                                        pricePerPerson: Math.max(0, Number(e.target.value) || 0),
+                                      })
+                                    }
+                                    className="field py-2 text-right num text-[15px] font-semibold text-coral"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-1 flex justify-end">
+                                  <button
+                                    type="button"
+                                    aria-label="Xóa hoạt động"
+                                    title="Xóa hoạt động"
+                                    onClick={() => removeStepByKey(s._key)}
+                                    className="btn btn-danger px-2.5 py-2 text-sm"
+                                  >
+                                    <Icon name="x" size={16} strokeWidth={1.5} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Popover chọn 1-chạm ảnh thật cho riêng chặng này */}
+                              {isPickingPhoto && (
+                                <div className="p-3.5 rounded-xl border border-coral/40 bg-surface-2 space-y-2.5">
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="font-semibold text-coral">
+                                      Chọn ảnh cho chặng: {s.title}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPickingStepKey(null)}
+                                      className="btn btn-ghost text-[13px] font-medium py-1 px-2.5"
+                                    >
+                                      Đóng
+                                    </button>
+                                  </div>
+                                  <RegionPhotoPicker
+                                    regionId={Number(regionId)}
+                                    selectedUrls={s.imageUrl ? [s.imageUrl] : []}
+                                    selectionMode="single"
+                                    compact
+                                    onToggleUrl={(pickedUrl) => {
+                                      updateStepByKey(s._key, { imageUrl: pickedUrl });
+                                      setPickingStepKey(null);
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        <div className="perf-x pt-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="shrink-0 px-6 py-4 border-t border-rule bg-surface flex items-center justify-between gap-3">
           <div>
-            <span className="coupon-head block text-[0.7rem] text-ink-3">
-              Tổng giá lịch trình chuẩn (1 khách)
-            </span>
-            <span className="num text-2xl font-bold text-carbon">
-              {formatVnd(basePricePerPerson)}
-            </span>
-            <span className="text-xs text-ink-3 ml-1.5">
-              /khách ({steps.filter((s) => s.dayNumber <= days).length} hoạt động trong {days} ngày)
-            </span>
+            <div className="text-sm font-medium text-ink-3">Giá cơ sở mới / khách</div>
+            <div className="num text-2xl font-semibold text-coral mt-0.5">
+              {formatVnd(basePrice)}
+            </div>
           </div>
-
-          <div className="flex gap-2">
-            <button type="button" onClick={onCancel} className="btn btn-ghost">
-              Huỷ
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="btn btn-ghost text-[15px] font-medium py-2.5 px-5"
+            >
+              Hủy
             </button>
             <button
-              type="submit"
-              disabled={submitting || steps.length === 0}
-              className="btn btn-primary btn-lg"
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="btn btn-primary text-[15px] font-medium py-2.5 px-5"
             >
-              <Icon name="check" size={16} />
-              {submitting
-                ? 'Đang lưu...'
-                : initialTour
-                ? 'Lưu cập nhật tour'
-                : 'Đăng tour lên hệ thống'}
+              <Icon name="check" size={16} strokeWidth={1.5} />
+              <span>
+                {saving
+                  ? 'Đang lưu'
+                  : isEdit
+                  ? `Lưu thành v${(editingTour?.version || 1) + 1}`
+                  : 'Xuất bản tour mẫu'}
+              </span>
             </button>
           </div>
         </div>
       </div>
-    </form>
+    </Dialog>
   );
 }

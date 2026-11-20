@@ -4,19 +4,20 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 4 bước thân thiện trên Thanh tiến trình (Stepper):
- * Bước 1: Khách gửi yêu cầu đặt tour (BOOKED_ORIGINAL)
- * Bước 2: Tuỳ chỉnh lịch trình - Chờ Guide báo giá (WAITING_REQUOTE)
- * Bước 3: Guide kiểm tra & Báo giá chốt (REQUOTED)
- * Bước 4: Khách đồng ý & Hoàn tất (CONFIRMED)
+ * 4 chặng tinh gọn trên Thanh tiến trình:
+ * 1: BOOKED_ORIGINAL  — Đặt theo lịch chuẩn
+ * 2: WAITING_REQUOTE  — Chờ Guide báo giá / CHANGE_REQUESTED — Điều chỉnh sau chốt
+ * 3: REQUOTED         — Guide đã báo giá mới
+ * 4: CONFIRMED        — Khách đã chốt
  */
 @Getter
 @RequiredArgsConstructor
 public enum BookingStatus {
-    BOOKED_ORIGINAL("Đặt theo lịch trình chuẩn", 1),
-    WAITING_REQUOTE("Đã tuỳ chỉnh · Chờ Guide báo giá", 2),
-    REQUOTED("Guide đã báo giá chốt", 3),
-    CONFIRMED("Khách đã đồng ý & Hoàn tất", 4),
+    BOOKED_ORIGINAL("Lịch trình chuẩn", 1),
+    WAITING_REQUOTE("Chờ báo giá", 2),
+    CHANGE_REQUESTED("Điều chỉnh sau chốt", 2),
+    REQUOTED("Đã có báo giá", 3),
+    CONFIRMED("Đã chốt", 4),
     CANCELLED("Đã huỷ", 0);
 
     private final String label;

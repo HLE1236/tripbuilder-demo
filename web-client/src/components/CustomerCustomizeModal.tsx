@@ -1,70 +1,120 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
 import {
   createBooking,
   customizeBooking,
   formatVnd,
   getOptionsByRegion,
+  noteTypeMeta,
   type Booking,
   type BookingStep,
   type PresetOption,
+  type ServiceMode,
   type Tour,
-  type User,
 } from '../api';
-import Icon, { categoryIconName, type IconName } from './Icon';
+import { Icon } from './Icon';
+import { SafeImage } from './SafeImage';
 
-interface Props {
+export interface CustomerCustomizeModalProps {
+  isOpen: boolean;
   tour: Tour;
-  customer: User;
-  /** Nếu truyền existingBooking vào -> Khách đang sửa lại một đơn đã đặt trước đó. */
+  customerId: number;
   existingBooking?: Booking | null;
   onClose: () => void;
-  onSubmitted: (booking: Booking) => void;
+  onSuccess: (booking: Booking) => void;
 }
 
-const QUICK_CUSTOM_CHIPS: { icon: IconName; text: string }[] = [
-  { icon: 'cake', text: 'Tổ chức sinh nhật / kỷ niệm tại phòng' },
-  { icon: 'flame', text: 'Thêm tiệc nướng BBQ tối riêng cho đoàn' },
-  { icon: 'camera', text: 'Thuê thợ chụp ảnh đi cùng đoàn' },
-  { icon: 'leaf', text: 'Thực đơn ăn chay / kiêng hải sản' },
-];
+interface LocalStep extends BookingStep {
+  _uid: string;
+  _restoreSnapshot?: {
+    title: string;
+    pricePerPerson: number;
+    noteType: string;
+  };
+}
 
-export default function CustomerCustomizeModal({
+const CATEGORIES = ['Di chuyển', 'Khách sạn', 'Ăn uống', 'Trải nghiệm', 'Yêu cầu thêm'];
+
+function categoryDotClass(category: string): string {
+  switch (category) {
+    case 'Khách sạn':
+      return 'bg-indigo';
+    case 'Ăn uống':
+      return 'bg-orange';
+    case 'Di chuyển':
+      return 'bg-sky';
+    case 'Trải nghiệm':
+      return 'bg-emerald';
+    default:
+      return 'bg-coral';
+  }
+}
+
+function getLocalTodayIso(): string {
+  const now = new Date();
+  const offsetMs = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+}
+
+function getDefaultStartDate(): string {
+  const future = new Date(Date.now() + 14 * 86400_000);
+  const offsetMs = future.getTimezoneOffset() * 60_000;
+  return new Date(future.getTime() - offsetMs).toISOString().slice(0, 10);
+}
+
+let uidSeq = 1;
+function nextUid(): string {
+  uidSeq += 1;
+  return `step-${Date.now()}-${uidSeq}`;
+}
+
+export function CustomerCustomizeModal({
+  isOpen,
   tour,
-  customer,
+  customerId,
   existingBooking,
   onClose,
-  onSubmitted,
-}: Props) {
-  const defaultDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  onSuccess,
+}: CustomerCustomizeModalProps) {
+  const todayStr = useMemo(() => getLocalTodayIso(), []);
+  const isPostConfirm =
+    existingBooking?.status === 'CONFIRMED' || existingBooking?.status === 'CHANGE_REQUESTED';
 
-  const [options, setOptions] = useState<PresetOption[]>([]);
-  const [startDate, setStartDate] = useState(existingBooking?.startDate || defaultDate);
+  const [startDate, setStartDate] = useState(
+    existingBooking?.startDate || getDefaultStartDate()
+  );
   const [days, setDays] = useState(existingBooking?.days || tour.days);
   const [guests, setGuests] = useState(existingBooking?.guests || 2);
+  const [serviceMode, setServiceMode] = useState<ServiceMode>(
+    existingBooking?.serviceMode === 'REMOTE' ? 'REMOTE' : 'COMPANION'
+  );
   const [customerNote, setCustomerNote] = useState(existingBooking?.customerNote || '');
 
-  const [steps, setSteps] = useState<BookingStep[]>(() => {
-    if (existingBooking) {
-      return existingBooking.steps.map((s) => ({
-        ...s,
-        originalTitle: s.originalTitle ?? s.title,
-        originalPricePerPerson: s.originalPricePerPerson ?? s.pricePerPerson,
-      }));
-    }
-    return tour.steps.map((s) => ({
-      dayNumber: s.dayNumber,
-      category: s.category,
-      title: s.title,
-      pricePerPerson: s.pricePerPerson,
-      originalTitle: s.title,
-      originalPricePerPerson: s.pricePerPerson,
-      noteType: 'PRESET',
-    }));
-  });
+  const [steps, setSteps] = useState<LocalStep[]>(() =>
+    existingBooking
+      ? existingBooking.steps.map((s) => ({ ...s, _uid: nextUid() }))
+      : tour.steps.map((s) => ({
+          _uid: nextUid(),
+          dayNumber: s.dayNumber,
+          category: s.category,
+          title: s.title,
+          imageUrl: s.imageUrl,
+          pricePerPerson: s.pricePerPerson,
+          originalTitle: s.title,
+          originalPricePerPerson: s.pricePerPerson,
+          noteType: 'PRESET',
+        }))
+  );
 
-  const [swappingIdx, setSwappingIdx] = useState<number | null>(null);
-  const [addingPresetDay, setAddingPresetDay] = useState<number | null>(null);
-  const [customDraft, setCustomDraft] = useState<Record<number, string>>({});
+  const [options, setOptions] = useState<PresetOption[]>([]);
+  const [expandedSwapUid, setExpandedSwapUid] = useState<string | null>(null);
+  const [openPresetDay, setOpenPresetDay] = useState<number | null>(null);
+  const [presetCatFilter, setPresetCatFilter] = useState<string>('ALL');
+  const [openCustomDay, setOpenCustomDay] = useState<number | null>(null);
+  const [customCat, setCustomCat] = useState('Yêu cầu thêm');
+  const [customTitle, setCustomTitle] = useState('');
+  const [pendingReduceDays, setPendingReduceDays] = useState<number | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -74,735 +124,993 @@ export default function CustomerCustomizeModal({
       .catch(() => setOptions([]));
   }, [tour.regionId]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const activeSteps = steps.filter((s) => s.noteType !== 'REMOVED');
+  const unpricedCustomCount = activeSteps.filter(
+    (s) => s.noteType === 'CUSTOM' || s.pricePerPerson === 0
+  ).length;
+  const estPerPerson = activeSteps.reduce((acc, s) => acc + (s.pricePerPerson || 0), 0);
+  const groupAdjustment = existingBooking?.groupAdjustment ?? 0;
+  const estTotal = Math.max(0, estPerPerson * guests + groupAdjustment);
 
-  const activeSteps = steps.filter((s) => s.dayNumber <= days);
-
-  const hasPendingDraft = Object.entries(customDraft).some(
-    ([d, text]) => Number(d) <= days && text.trim().length > 0
-  );
-
-  const isModifiedFromOriginal =
+  const hasChanges =
     days !== tour.days ||
-    activeSteps.length !== tour.steps.length ||
-    activeSteps.some((s) => s.noteType !== 'PRESET') ||
-    hasPendingDraft;
+    steps.some((s) => s.noteType !== 'PRESET') ||
+    existingBooking?.status === 'REQUOTED' ||
+    isPostConfirm;
 
-  const estimatedPerPerson = activeSteps
-    .filter((s) => s.noteType !== 'REMOVED')
-    .reduce((sum, s) => sum + (Number(s.pricePerPerson) || 0), 0);
-  const estimatedTotal = estimatedPerPerson * guests;
-  const priceDiffPerPerson = estimatedPerPerson - tour.basePricePerPerson;
-
-  const hasCustomUnpriced =
-    activeSteps.some((s) => s.noteType === 'CUSTOM' && s.pricePerPerson === 0) ||
-    hasPendingDraft;
-
-  const dayNumbers = Array.from({ length: days }, (_, i) => i + 1);
-
-  const handleSwapStepWithOption = (idx: number, opt: PresetOption) => {
+  const swapStepWithOption = (uid: string, opt: PresetOption) => {
     setSteps((prev) =>
-      prev.map((s, i) => {
-        if (i !== idx) return s;
-        const origTitle = s.originalTitle ?? s.title;
-        const origPrice = s.originalPricePerPerson ?? s.pricePerPerson;
-        const isSameAsOriginal = opt.title === origTitle && opt.pricePerPerson === origPrice;
+      prev.map((s) => {
+        if (s._uid !== uid) return s;
+        const isBackToOriginal =
+          Boolean(s.originalTitle) &&
+          opt.title === s.originalTitle &&
+          opt.pricePerPerson === (s.originalPricePerPerson ?? 0);
         return {
           ...s,
-          category: opt.category,
           title: opt.title,
+          imageUrl: opt.imageUrl || s.imageUrl,
           pricePerPerson: opt.pricePerPerson,
-          originalTitle: origTitle,
-          originalPricePerPerson: origPrice,
-          noteType: isSameAsOriginal ? 'PRESET' : 'MODIFIED',
+          noteType: s.originalTitle ? (isBackToOriginal ? 'PRESET' : 'MODIFIED') : 'MODIFIED',
         };
       })
     );
-    setSwappingIdx(null);
+    setExpandedSwapUid(null);
   };
 
-  const handleRestoreStepToOriginal = (idx: number) => {
+  const restoreOriginalStep = (uid: string) => {
     setSteps((prev) =>
-      prev.map((s, i) => {
-        if (i !== idx) return s;
-        return {
-          ...s,
-          title: s.originalTitle || s.title,
-          pricePerPerson: s.originalPricePerPerson ?? s.pricePerPerson,
-          noteType: 'PRESET',
-        };
+      prev.map((s) => {
+        if (s._uid !== uid) return s;
+        if (s.originalTitle) {
+          const origStep = tour.steps.find((ts) => ts.title === s.originalTitle);
+          const origPrice = s.originalPricePerPerson ?? origStep?.pricePerPerson ?? 0;
+          return {
+            ...s,
+            title: s.originalTitle,
+            imageUrl: origStep?.imageUrl || s.imageUrl,
+            pricePerPerson: origPrice,
+            noteType: 'PRESET',
+            _restoreSnapshot: undefined,
+          };
+        }
+        if (s._restoreSnapshot) {
+          return {
+            ...s,
+            title: s._restoreSnapshot.title,
+            pricePerPerson: s._restoreSnapshot.pricePerPerson,
+            noteType: s._restoreSnapshot.noteType,
+            _restoreSnapshot: undefined,
+          };
+        }
+        return s;
       })
     );
-    if (swappingIdx === idx) setSwappingIdx(null);
+    setExpandedSwapUid(null);
   };
 
-  const handleSoftRemoveOrDeleteStep = (idx: number) => {
-    setSteps((prev) => {
-      const target = prev[idx];
-      if (!target) return prev;
-      if (target.noteType === 'CUSTOM' || !target.originalTitle) {
-        return prev.filter((_, i) => i !== idx);
-      }
-      return prev.map((s, i) =>
-        i === idx
-          ? {
-              ...s,
-              originalTitle: s.originalTitle ?? s.title,
-              originalPricePerPerson: s.originalPricePerPerson ?? s.pricePerPerson,
-              pricePerPerson: 0,
-              noteType: 'REMOVED',
+  const toggleRemove = (uid: string) => {
+    if (expandedSwapUid === uid) setExpandedSwapUid(null);
+    setSteps((prev) =>
+      prev
+        .map((s): LocalStep | null => {
+          if (s._uid !== uid) return s;
+
+          if (s.noteType === 'REMOVED') {
+            if (s.originalTitle) {
+              const origStep = tour.steps.find((ts) => ts.title === s.originalTitle);
+              const origPrice = s.originalPricePerPerson ?? origStep?.pricePerPerson ?? 0;
+              return {
+                ...s,
+                title: s.originalTitle,
+                pricePerPerson: origPrice,
+                noteType: 'PRESET',
+                _restoreSnapshot: undefined,
+              };
             }
-          : s
-      );
-    });
-    if (swappingIdx === idx) setSwappingIdx(null);
+            if (s._restoreSnapshot) {
+              return {
+                ...s,
+                title: s._restoreSnapshot.title,
+                pricePerPerson: s._restoreSnapshot.pricePerPerson,
+                noteType: s._restoreSnapshot.noteType,
+                _restoreSnapshot: undefined,
+              };
+            }
+            return { ...s, noteType: 'PRESET' };
+          }
+
+          if (s.originalTitle || s.noteType === 'GUIDE' || s.noteType === 'ALTERNATIVE') {
+            return {
+              ...s,
+              _restoreSnapshot: {
+                title: s.title,
+                pricePerPerson: s.pricePerPerson,
+                noteType: s.noteType,
+              },
+              noteType: 'REMOVED',
+              pricePerPerson: 0,
+            };
+          }
+
+          return null;
+        })
+        .filter((x): x is LocalStep => x !== null)
+    );
   };
 
-  const handleAddExtraPresetOption = (dayNumber: number, opt: PresetOption) => {
+  const addPresetOptionToDay = (dayNum: number, opt: PresetOption) => {
     setSteps((prev) => [
       ...prev,
       {
-        dayNumber,
+        _uid: nextUid(),
+        dayNumber: dayNum,
         category: opt.category,
         title: opt.title,
+        imageUrl: opt.imageUrl || tour.imageUrl,
         pricePerPerson: opt.pricePerPerson,
         originalTitle: null,
-        originalPricePerPerson: null,
+        originalPricePerPerson: 0,
         noteType: 'MODIFIED',
       },
     ]);
-    setAddingPresetDay(null);
+    setOpenPresetDay(null);
   };
 
-  const handleAddCustomRequestText = (dayNumber: number, rawText: string) => {
-    const text = rawText.trim();
-    if (!text) return;
+  const addCustomStepToDay = (dayNum: number) => {
+    if (!customTitle.trim()) return;
     setSteps((prev) => [
       ...prev,
       {
-        dayNumber,
-        category: 'Yêu cầu thêm',
-        title: text,
+        _uid: nextUid(),
+        dayNumber: dayNum,
+        category: customCat,
+        title: customTitle.trim(),
+        imageUrl: tour.imageUrl,
         pricePerPerson: 0,
         originalTitle: null,
-        originalPricePerPerson: null,
+        originalPricePerPerson: 0,
         noteType: 'CUSTOM',
       },
     ]);
-    setCustomDraft((prev) => ({ ...prev, [dayNumber]: '' }));
+    setCustomTitle('');
+    setOpenCustomDay(null);
   };
 
-  const handleResetToPreset = () => {
-    setDays(tour.days);
-    setSwappingIdx(null);
-    setAddingPresetDay(null);
-    setCustomDraft({});
-    setSteps(
-      tour.steps.map((s) => ({
-        dayNumber: s.dayNumber,
-        category: s.category,
-        title: s.title,
-        pricePerPerson: s.pricePerPerson,
-        originalTitle: s.title,
-        originalPricePerPerson: s.pricePerPerson,
-        noteType: 'PRESET',
-      }))
+  const handleDecreaseDays = () => {
+    if (days <= 1) return;
+    const nextDays = days - 1;
+    const activeAffected = steps.filter((s) => s.dayNumber > nextDays && s.noteType !== 'REMOVED');
+    if (activeAffected.length > 0) {
+      setPendingReduceDays(nextDays);
+      return;
+    }
+    setSteps((prev) =>
+      prev.map((s) => (s.dayNumber > nextDays ? { ...s, dayNumber: nextDays } : s))
     );
+    setDays(nextDays);
+    if (openPresetDay && openPresetDay > nextDays) setOpenPresetDay(null);
+    if (openCustomDay && openCustomDay > nextDays) setOpenCustomDay(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const resolveDayReduction = (action: 'move' | 'void' | 'cancel') => {
+    if (pendingReduceDays == null) return;
+    const targetDays = pendingReduceDays;
+    setPendingReduceDays(null);
+    if (action === 'cancel') return;
+
+    if (action === 'move') {
+      setSteps((prev) =>
+        prev.map((s) => (s.dayNumber > targetDays ? { ...s, dayNumber: targetDays } : s))
+      );
+    } else {
+      setSteps((prev) =>
+        prev
+          .map((s): LocalStep | null => {
+            if (s.dayNumber <= targetDays) return s;
+            if (s.originalTitle || s.noteType === 'GUIDE' || s.noteType === 'ALTERNATIVE') {
+              return {
+                ...s,
+                dayNumber: targetDays,
+                _restoreSnapshot:
+                  s.noteType !== 'REMOVED'
+                    ? {
+                        title: s.title,
+                        pricePerPerson: s.pricePerPerson,
+                        noteType: s.noteType,
+                      }
+                    : s._restoreSnapshot,
+                noteType: 'REMOVED',
+                pricePerPerson: 0,
+              };
+            }
+            return null;
+          })
+          .filter((x): x is LocalStep => x !== null)
+      );
+    }
+    setDays(targetDays);
+    if (openPresetDay && openPresetDay > targetDays) setOpenPresetDay(null);
+    if (openCustomDay && openCustomDay > targetDays) setOpenCustomDay(null);
+  };
+
+  const handleSubmit = async () => {
     setError('');
+    if (activeSteps.length === 0) {
+      setError('Lịch trình phải có ít nhất 1 hoạt động chưa bị bỏ.');
+      return;
+    }
+    if (pendingReduceDays !== null) {
+      setError('Vui lòng chọn cách xử lý các hoạt động ở ngày bị cắt trước khi gửi.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const autoSavedDraftSteps: BookingStep[] = [];
-      for (let d = 1; d <= days; d++) {
-        const draftText = (customDraft[d] || '').trim();
-        if (draftText.length > 0) {
-          autoSavedDraftSteps.push({
-            dayNumber: d,
-            category: 'Yêu cầu thêm',
-            title: draftText,
-            pricePerPerson: 0,
-            originalTitle: null,
-            originalPricePerPerson: null,
-            noteType: 'CUSTOM',
+      const payloadSteps: BookingStep[] = steps.map((s) => ({
+        id: s.id,
+        dayNumber: Math.min(Math.max(1, s.dayNumber), days),
+        category: s.category,
+        title: s.title,
+        imageUrl: s.imageUrl,
+        pricePerPerson: s.pricePerPerson,
+        originalTitle: s.originalTitle,
+        originalPricePerPerson: s.originalPricePerPerson,
+        noteType: s.noteType,
+      }));
+
+      const saved = existingBooking
+        ? await customizeBooking(existingBooking.id, {
+            startDate,
+            days,
+            guests,
+            serviceMode,
+            customerNote,
+            steps: payloadSteps,
+          })
+        : await createBooking({
+            tourId: tour.id,
+            customerId,
+            startDate,
+            days,
+            guests,
+            serviceMode,
+            customerNote,
+            customized: hasChanges,
+            steps: payloadSteps,
           });
-        }
-      }
-
-      const finalSteps = [
-        ...steps.filter((s) => s.dayNumber <= days && s.title.trim().length > 0),
-        ...autoSavedDraftSteps,
-      ];
-
-      const nonRemovedCount = finalSteps.filter((s) => s.noteType !== 'REMOVED').length;
-      if (nonRemovedCount === 0) {
-        throw new Error('Lịch trình cần giữ lại ít nhất 1 hoạt động.');
-      }
-
-      const finalCustomized =
-        days !== tour.days ||
-        finalSteps.length !== tour.steps.length ||
-        finalSteps.some((s) => s.noteType !== 'PRESET');
-
-      if (existingBooking) {
-        const updated = await customizeBooking(existingBooking.id, {
-          startDate,
-          days,
-          guests,
-          customerNote,
-          steps: finalSteps,
-        });
-        onSubmitted(updated);
-      } else {
-        const created = await createBooking({
-          tourId: tour.id,
-          customerId: customer.id,
-          startDate,
-          days,
-          guests,
-          customerNote,
-          customized: finalCustomized,
-          steps: finalSteps,
-        });
-        onSubmitted(created);
-      }
-    } catch (err) {
-      setError((err as Error).message);
+      onSuccess(saved);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể lưu yêu cầu');
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="customize-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-2 sm:p-4 anim-backdrop"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-hairline bg-stock shadow-lift anim-rise"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Đầu vé (navy header) */}
-        <div className="bg-navy text-navy-ink px-5 py-4 flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-navy-ink-2">
-              <span className="coupon-head text-[#f2c14e]">
-                {tour.regionName} ({tour.province}) · Chuẩn {tour.days}N{tour.days > 1 ? `${tour.days - 1}Đ` : ''}
-              </span>
-              <span>·</span>
-              <span className="inline-flex items-center gap-1">
-                <Icon name="compass" size={13} />
-                Guide {tour.guide.fullName} ({tour.guide.phone})
-              </span>
-            </div>
-            <h2 id="customize-modal-title" className="font-head text-2xl font-bold uppercase tracking-wide text-white">
-              {tour.title}
-            </h2>
-          </div>
+  const dayList = Array.from({ length: days }, (_, i) => i + 1);
+  const affectedCount =
+    pendingReduceDays != null
+      ? steps.filter((s) => s.dayNumber > pendingReduceDays && s.noteType !== 'REMOVED').length
+      : 0;
 
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <span className="block text-[0.7rem] text-navy-ink-2">Giá lịch trình chuẩn</span>
-              <span className="num text-lg font-bold text-[#f2c14e]">
-                {formatVnd(tour.basePricePerPerson)}
-              </span>
-              <span className="text-xs text-navy-ink-2">/khách</span>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Đóng hộp thoại"
-              className="btn btn-sm border-white/20 bg-white/10 text-white hover:bg-white/20"
-            >
-              <Icon name="x" size={15} />
-              Đóng
-            </button>
-          </div>
+  return (
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      width={980}
+      maxHeight="92dvh"
+      purpose="form"
+    >
+      <div className="flex flex-col max-h-[86dvh] min-h-0 overflow-hidden bg-surface">
+        <div className="shrink-0 border-b border-rule">
+          <DialogHeader
+            title={
+              isPostConfirm
+                ? `Xin điều chỉnh sau khi chốt · ${existingBooking?.code}`
+                : existingBooking
+                ? `Tuỳ chỉnh lịch trình · ${existingBooking.code}`
+                : `Tuỳ chỉnh & Đặt chuyến · ${tour.title}`
+            }
+            subtitle={`${tour.regionName} · Guide ${tour.guide.fullName}`}
+            onOpenChange={(open) => !open && onClose()}
+          />
         </div>
 
-        {/* Thân vé (cuộn) */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6">
+        <div className="flex-1 min-h-0 p-5 space-y-5 overflow-y-auto bg-canvas">
+          {isPostConfirm && (
+            <div className="rounded-xl border border-amber/40 bg-amber-soft px-4 py-3.5 text-sm font-medium text-amber flex items-start gap-3">
+              <Icon name="alert" size={18} className="mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold">Đơn này đã chốt lịch trước đó</div>
+                <div className="mt-0.5">
+                  Giá đã chốt:{' '}
+                  <span className="num font-semibold">
+                    {formatVnd(
+                      existingBooking?.confirmedTotalPrice ?? existingBooking?.totalPrice
+                    )}
+                  </span>
+                  . Thay đổi sẽ được gửi sang Guide để báo giá phần chênh lệch.
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
-            <div role="alert" className="flex items-center gap-2 rounded-md border border-red/40 bg-red-soft px-4 py-3 text-sm text-ink">
-              <Icon name="alert" size={16} className="text-red" />
+            <div className="rounded-xl border border-crimson/40 bg-crimson-soft px-4 py-3.5 text-sm font-medium text-crimson flex items-start gap-3">
+              <Icon name="alert" size={18} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Hàng thông số chuyến đi (4 ô kẻ hairline như cuống vé) */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 rounded-lg border border-hairline bg-stock-2 divide-y sm:divide-y-0 sm:divide-x divide-hairline">
-            <div className="p-3.5">
-              <span className="coupon-head block text-[0.7rem] text-ink-3">Hành khách</span>
-              <p className="mt-1 flex items-center gap-1.5 font-semibold text-sm text-ink truncate">
-                <Icon name="user" size={15} className="text-ink-3" />
-                {customer.fullName}
-              </p>
-            </div>
-
-            <div className="p-3.5">
-              <label htmlFor="booking-start-date" className="coupon-head block text-[0.7rem] text-ink-3">
-                Ngày khởi hành
-              </label>
-              <input
-                id="booking-start-date"
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="field mt-1 py-1 text-sm num"
-              />
-            </div>
-
-            <div className="p-3.5">
-              <span className="coupon-head block text-[0.7rem] text-ink-3">Số khách tham gia</span>
-              <div className="mt-1 flex items-center justify-between rounded-md border border-hairline-strong bg-stock px-1.5 py-0.5">
-                <button
-                  type="button"
-                  aria-label="Giảm số khách"
-                  onClick={() => setGuests((g) => Math.max(1, g - 1))}
-                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
-                >
-                  <Icon name="minus" size={14} />
-                </button>
-                <span className="num text-sm font-bold text-carbon">{guests} khách</span>
-                <button
-                  type="button"
-                  aria-label="Tăng số khách"
-                  onClick={() => setGuests((g) => Math.min(30, g + 1))}
-                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
-                >
-                  <Icon name="plus" size={14} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-3.5">
-              <span className="coupon-head block text-[0.7rem] text-ink-3">
-                Thời lượng (chuẩn {tour.days} ngày)
+          {/* Thông số hành trình */}
+          <section className="flagship-card">
+            <div className="bg-surface-2 px-5 py-3 border-b border-rule flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-ink">Thông tin hành trình & Đoàn khách</span>
+              <span className="num text-sm font-medium text-ink-2">
+                Mẫu chuẩn: {tour.days} ngày · {formatVnd(tour.basePricePerPerson)}/khách
               </span>
-              <div className="mt-1 flex items-center justify-between rounded-md border border-hairline-strong bg-stock px-1.5 py-0.5">
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-rule">
+              <div className="p-4 space-y-2">
+                <label htmlFor="cust-start-date" className="text-sm font-medium text-ink-3 block">
+                  Ngày khởi hành
+                </label>
+                <div className="relative flex items-center">
+                  <Icon
+                    name="calendar"
+                    size={16}
+                    className="text-ink-3 absolute left-3 pointer-events-none"
+                  />
+                  <input
+                    id="cust-start-date"
+                    type="date"
+                    min={todayStr}
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="field num !pl-9 !py-2 text-base"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 space-y-2">
+                <span className="text-sm font-medium text-ink-3 block">Số ngày</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDecreaseDays}
+                    disabled={days <= 1}
+                    aria-label="Giảm số ngày"
+                    className="btn btn-ghost !p-2 h-10 w-10"
+                  >
+                    <Icon name="minus" size={16} />
+                  </button>
+                  <span className="num text-base font-semibold text-ink flex-1 text-center">
+                    {days} ngày
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingReduceDays(null);
+                      setDays((d) => Math.min(10, d + 1));
+                    }}
+                    disabled={days >= 10}
+                    aria-label="Tăng số ngày"
+                    className="btn btn-ghost !p-2 h-10 w-10"
+                  >
+                    <Icon name="plus" size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-2">
+                <span className="text-sm font-medium text-ink-3 block">Số khách</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGuests((g) => Math.max(1, g - 1))}
+                    disabled={guests <= 1}
+                    aria-label="Giảm số khách"
+                    className="btn btn-ghost !p-2 h-10 w-10"
+                  >
+                    <Icon name="minus" size={16} />
+                  </button>
+                  <span className="num text-base font-semibold text-ink flex-1 text-center inline-flex items-center justify-center gap-1.5">
+                    <Icon name="users" size={16} className="text-ink-3" />
+                    {guests}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setGuests((g) => Math.min(30, g + 1))}
+                    disabled={guests >= 30}
+                    aria-label="Tăng số khách"
+                    className="btn btn-ghost !p-2 h-10 w-10"
+                  >
+                    <Icon name="plus" size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-2">
+                <span className="text-sm font-medium text-ink-3 block">Hình thức Guide</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={serviceMode === 'COMPANION'}
+                    onClick={() => setServiceMode('COMPANION')}
+                    className="chip !rounded-lg justify-center !py-2 text-sm font-medium"
+                  >
+                    Đi cùng
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={serviceMode === 'REMOTE'}
+                    onClick={() => setServiceMode('REMOTE')}
+                    className="chip !rounded-lg justify-center !py-2 text-sm font-medium"
+                  >
+                    Đặt hộ
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Cảnh báo khi giảm số ngày mà ngày bị cắt có hoạt động */}
+          {pendingReduceDays !== null && (
+            <div className="flagship-card border border-amber bg-amber-soft p-5 space-y-3">
+              <div className="flex items-start gap-3 text-amber">
+                <Icon name="alert" size={20} className="mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <div className="text-base font-semibold">
+                    Ngày {pendingReduceDays + 1} đang có {affectedCount} hoạt động
+                  </div>
+                  <p className="text-sm font-medium leading-relaxed">
+                    Khi rút ngắn hành trình xuống còn {pendingReduceDays} ngày, bạn muốn xử lý các
+                    dịch vụ ở ngày bị cắt như thế nào?
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5 pl-8">
                 <button
                   type="button"
-                  aria-label="Giảm số ngày"
-                  onClick={() => setDays((d) => Math.max(1, d - 1))}
-                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
+                  onClick={() => resolveDayReduction('move')}
+                  className="btn btn-primary !py-2 !px-3.5 text-sm font-medium"
                 >
-                  <Icon name="minus" size={14} />
+                  Chuyển sang Ngày {pendingReduceDays}
                 </button>
-                <span className="num text-sm font-bold text-ink">{days} ngày</span>
                 <button
                   type="button"
-                  aria-label="Tăng số ngày"
-                  onClick={() => setDays((d) => Math.min(7, d + 1))}
-                  className="grid h-7 w-7 place-items-center rounded text-ink-2 hover:bg-stock-2 cursor-pointer"
+                  onClick={() => resolveDayReduction('void')}
+                  className="btn btn-danger !py-2 !px-3.5 text-sm font-medium"
                 >
-                  <Icon name="plus" size={14} />
+                  Đánh dấu bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => resolveDayReduction('cancel')}
+                  className="btn btn-ghost !py-2 !px-3.5 text-sm font-medium"
+                >
+                  Giữ nguyên {days} ngày
                 </button>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Danh sách các tờ coupon theo từng ngày */}
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h3 className="font-head text-xl font-bold uppercase tracking-wide text-ink">
-                  Các chặng trong lịch trình
-                </h3>
-                <p className="text-xs text-ink-2">
-                  Ưng ý lịch trình chuẩn? Bấm <strong>Đặt ngay</strong> ở cuối phiếu. Muốn đổi khách sạn hay bỏ mục nào, bấm nút ngay trên dòng đó.
-                </p>
-              </div>
-              {isModifiedFromOriginal && (
-                <button type="button" onClick={handleResetToPreset} className="btn btn-ghost btn-sm">
-                  <Icon name="undo" size={14} />
-                  Khôi phục lịch trình gốc
-                </button>
-              )}
-            </div>
-
-            {dayNumbers.map((day) => {
-              const daySteps = steps
-                .map((s, idx) => ({ ...s, idx }))
-                .filter((s) => s.dayNumber === day);
+          {/* Danh sách Ngày 1..days */}
+          <div className="space-y-5">
+            {dayList.map((dayNum) => {
+              const dayItems = steps.filter((s) => s.dayNumber === dayNum);
+              const dayActiveSubtotal = dayItems
+                .filter((s) => s.noteType !== 'REMOVED')
+                .reduce((acc, s) => acc + (s.pricePerPerson || 0), 0);
+              const isPresetOpen = openPresetDay === dayNum;
+              const isCustomOpen = openCustomDay === dayNum;
+              const filteredRegionOptions = options.filter(
+                (o) => presetCatFilter === 'ALL' || o.category === presetCatFilter
+              );
 
               return (
-                <section
-                  key={day}
-                  aria-label={`Lịch trình ngày ${day}`}
-                  className="rounded-lg border border-hairline bg-stock shadow-coupon overflow-hidden"
-                >
-                  <div className="bg-stock-2 px-4 py-2.5 border-b border-hairline flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="coupon-head text-sm text-ink">Coupon ngày {day}</span>
-                      {day > tour.days && (
-                        <span className="stamp text-amber">Ngày mở rộng</span>
-                      )}
+                <section key={dayNum} className="flagship-card">
+                  <div className="bg-surface-2 border-b border-rule px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-semibold text-ink">
+                        Ngày {String(dayNum).padStart(2, '0')}
+                      </span>
+                      <span className="text-sm text-ink-3">
+                        {dayItems.filter((s) => s.noteType !== 'REMOVED').length} mục hoạt động
+                        {dayNum > tour.days && ' · Ngày thêm mới'}
+                      </span>
                     </div>
-                    <span className="num text-xs text-ink-3">
-                      {daySteps.filter((s) => s.noteType !== 'REMOVED').length} hoạt động
-                    </span>
+
+                    <div className="text-right">
+                      <span className="text-sm text-ink-3 mr-2">Đơn giá ngày:</span>
+                      <span className="num text-lg font-semibold text-ink">
+                        {formatVnd(dayActiveSubtotal)}
+                      </span>
+                      <span className="text-sm text-ink-3"> /khách</span>
+                    </div>
                   </div>
 
-                  {daySteps.length === 0 && (
-                    <div className="px-4 py-4 text-sm text-amber bg-amber-soft">
-                      Bạn vừa thêm Ngày {day}. Hãy chọn hoạt động gợi ý bên dưới hoặc ghi yêu cầu để Guide sắp xếp lịch trình cho Ngày {day}.
+                  {dayItems.length === 0 ? (
+                    <div className="px-5 py-7 text-center text-[15px] text-ink-2 bg-surface">
+                      Ngày {dayNum} chưa có dịch vụ nào. Chọn dịch vụ có sẵn tại {tour.regionName}{' '}
+                      hoặc tự nhập yêu cầu riêng bên dưới.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-rule">
+                      {dayItems.map((s) => {
+                        const isRemoved = s.noteType === 'REMOVED';
+                        const meta = noteTypeMeta(s.noteType);
+                        const sameCatOptions = options.filter((o) => o.category === s.category);
+                        const canSwap = !isRemoved && sameCatOptions.length > 0 && s.noteType !== 'CUSTOM';
+                        const isSwapExpanded = expandedSwapUid === s._uid;
+                        const origPrice = s.originalPricePerPerson ?? 0;
+                        const diffFromOrig =
+                          s.originalTitle != null && !isRemoved ? s.pricePerPerson - origPrice : 0;
+
+                        return (
+                          <div key={s._uid} className={isRemoved ? 'bg-surface-2/80' : 'bg-surface'}>
+                            <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                              <SafeImage
+                                src={s.imageUrl || tour.imageUrl}
+                                alt={s.title}
+                                className={`w-full sm:w-24 h-28 sm:h-[72px] rounded-lg object-cover shrink-0 border border-rule ${
+                                  isRemoved ? 'opacity-50 grayscale' : ''
+                                }`}
+                              />
+
+                              <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="inline-flex items-center gap-2 rounded-md border border-rule bg-surface-2 px-2.5 py-0.5 text-sm font-medium text-ink-2">
+                                    <span
+                                      className={`h-1.5 w-1.5 rounded-full ${categoryDotClass(
+                                        s.category
+                                      )}`}
+                                    />
+                                    <span>{s.category}</span>
+                                  </span>
+                                  <span className={`tag ${meta.tagClass} !normal-case !tracking-normal !font-medium`}>
+                                    {meta.label === 'ĐÃ BỎ' ? 'Đã bỏ' : meta.label}
+                                  </span>
+                                </div>
+
+                                <div
+                                  className={`text-[17px] font-semibold leading-snug ${
+                                    isRemoved ? 'line-through text-ink-3' : 'text-ink'
+                                  }`}
+                                >
+                                  {s.title}
+                                </div>
+
+                                {s.originalTitle && s.originalTitle !== s.title && !isRemoved && (
+                                  <div className="text-sm text-ink-2">
+                                    Thay cho: <span className="line-through">{s.originalTitle}</span>{' '}
+                                    (<span className="num font-medium">{formatVnd(origPrice)}</span>)
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 shrink-0">
+                                <div className="text-left sm:text-right mr-1 space-y-1">
+                                  <div
+                                    className={`num text-lg font-semibold ${
+                                      isRemoved
+                                        ? 'text-crimson'
+                                        : s.pricePerPerson > 0
+                                        ? 'text-ink'
+                                        : 'text-amber'
+                                    }`}
+                                  >
+                                    {isRemoved ? (
+                                      '0đ'
+                                    ) : s.pricePerPerson > 0 ? (
+                                      formatVnd(s.pricePerPerson)
+                                    ) : (
+                                      <span className="inline-flex items-center rounded-md bg-amber-soft text-amber px-2.5 py-0.5 text-sm font-medium">
+                                        Chờ báo giá
+                                      </span>
+                                    )}
+                                  </div>
+                                  {diffFromOrig !== 0 && (
+                                    <div>
+                                      <span
+                                        className={`num inline-flex items-center rounded-md px-2.5 py-0.5 text-sm font-medium ${
+                                          diffFromOrig > 0
+                                            ? 'bg-amber-soft text-amber'
+                                            : 'bg-emerald-soft text-emerald'
+                                        }`}
+                                      >
+                                        {diffFromOrig > 0
+                                          ? `+${formatVnd(diffFromOrig)}`
+                                          : formatVnd(diffFromOrig)}
+                                        /khách
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {canSwap && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedSwapUid(isSwapExpanded ? null : s._uid)
+                                    }
+                                    aria-expanded={isSwapExpanded}
+                                    className={`btn !py-2 !px-3 text-sm font-medium ${
+                                      isSwapExpanded ? 'btn-primary' : 'btn-ghost'
+                                    }`}
+                                  >
+                                    <Icon name="swap" size={14} />
+                                    <span>{isSwapExpanded ? 'Đóng lựa chọn' : 'Đổi lựa chọn'}</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRemove(s._uid)}
+                                  className={
+                                    isRemoved
+                                      ? 'btn btn-confirm !py-2 !px-3 text-sm font-medium'
+                                      : 'btn btn-danger !py-2 !px-3 text-sm font-medium'
+                                  }
+                                >
+                                  <Icon name={isRemoved ? 'restore' : 'void'} size={14} />
+                                  <span>{isRemoved ? 'Khôi phục' : 'Bỏ mục này'}</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {isSwapExpanded && (
+                              <div className="bg-surface-2 border-t border-rule px-5 py-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-sm font-semibold text-ink">
+                                    Chọn phương án {s.category} thay thế tại {tour.regionName}
+                                  </span>
+                                  <span className="text-sm text-ink-3">
+                                    Chênh lệch tính so với lựa chọn đang hiển thị
+                                  </span>
+                                </div>
+
+                                <div className="divide-y divide-rule rounded-lg border border-rule bg-surface overflow-hidden">
+                                  {s.originalTitle &&
+                                    s.originalTitle !== s.title &&
+                                    !sameCatOptions.some((o) => o.title === s.originalTitle) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => restoreOriginalStep(s._uid)}
+                                        className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-surface-2 text-left cursor-pointer transition-colors duration-150"
+                                      >
+                                        <div className="min-w-0">
+                                          <div className="text-[15px] font-semibold text-ink truncate">
+                                            {s.originalTitle}{' '}
+                                            <span className="text-ink-2">(Mục gốc của tour)</span>
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0 space-y-0.5">
+                                          <div className="num text-[15px] font-semibold text-ink">
+                                            {formatVnd(origPrice)}
+                                          </div>
+                                          <div>
+                                            <span
+                                              className={`num inline-flex items-center rounded-md px-2 py-0.5 text-sm font-medium ${
+                                                origPrice - s.pricePerPerson > 0
+                                                  ? 'bg-amber-soft text-amber'
+                                                  : origPrice - s.pricePerPerson < 0
+                                                  ? 'bg-emerald-soft text-emerald'
+                                                  : 'bg-surface-2 text-ink-3'
+                                              }`}
+                                            >
+                                              {origPrice - s.pricePerPerson === 0
+                                                ? 'Không đổi giá'
+                                                : `${origPrice - s.pricePerPerson > 0 ? '+' : ''}${formatVnd(
+                                                    origPrice - s.pricePerPerson
+                                                  )}/khách`}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </button>
+                                    )}
+
+                                  {sameCatOptions.map((opt) => {
+                                    const isSelected =
+                                      opt.title === s.title &&
+                                      opt.pricePerPerson === s.pricePerPerson;
+                                    const isOriginal =
+                                      Boolean(s.originalTitle) && opt.title === s.originalTitle;
+                                    const delta = opt.pricePerPerson - s.pricePerPerson;
+
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        disabled={isSelected}
+                                        onClick={() => swapStepWithOption(s._uid, opt)}
+                                        className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-left transition-colors duration-150 ${
+                                          isSelected
+                                            ? 'bg-surface-2 cursor-default'
+                                            : 'hover:bg-surface-2 cursor-pointer'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                          <SafeImage
+                                            src={opt.imageUrl || tour.imageUrl}
+                                            alt={opt.title}
+                                            className="w-14 h-11 rounded-lg object-cover border border-rule shrink-0"
+                                          />
+                                          <div className="min-w-0">
+                                            <div className="text-[15px] font-semibold text-ink truncate">
+                                              {opt.title}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                              {isOriginal && (
+                                                <span className="text-ink-2 font-medium">
+                                                  Mục gốc của tour
+                                                </span>
+                                              )}
+                                              {isSelected && (
+                                                <span className="text-coral font-medium">
+                                                  Đang chọn
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="text-right shrink-0 space-y-0.5">
+                                          <div className="num text-[15px] font-semibold text-ink">
+                                            {formatVnd(opt.pricePerPerson)}
+                                          </div>
+                                          <div>
+                                            <span
+                                              className={`num inline-flex items-center rounded-md px-2 py-0.5 text-sm font-medium ${
+                                                isSelected
+                                                  ? 'bg-surface-2 text-ink-3'
+                                                  : delta > 0
+                                                  ? 'bg-amber-soft text-amber'
+                                                  : delta < 0
+                                                  ? 'bg-emerald-soft text-emerald'
+                                                  : 'bg-surface-2 text-ink-3'
+                                              }`}
+                                            >
+                                              {isSelected
+                                                ? 'Đang chọn'
+                                                : delta === 0
+                                                ? 'Không đổi giá'
+                                                : `${delta > 0 ? '+' : ''}${formatVnd(
+                                                    delta
+                                                  )}/khách`}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
-                  <div className="divide-y divide-hairline">
-                    {daySteps.map((st) => {
-                      const isRemoved = st.noteType === 'REMOVED';
-                      const isModified = st.noteType === 'MODIFIED';
-                      const isCustom = st.noteType === 'CUSTOM';
-                      const isSwappingThis = swappingIdx === st.idx;
+                  {/* Thêm từ kho vùng hoặc Tự nhập yêu cầu riêng */}
+                  <div className="bg-surface-2 border-t border-rule px-5 py-3.5 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenCustomDay(null);
+                          setPresetCatFilter('ALL');
+                          setOpenPresetDay(isPresetOpen ? null : dayNum);
+                        }}
+                        className={`btn !py-2 !px-3.5 text-sm font-medium ${
+                          isPresetOpen ? 'btn-primary' : 'btn-ghost'
+                        }`}
+                      >
+                        <Icon name="plus" size={15} />
+                        <span>Chọn dịch vụ có sẵn từ kho vùng</span>
+                      </button>
 
-                      const sameCategoryOptions = options.filter(
-                        (o) => o.category.toLowerCase() === st.category.toLowerCase()
-                      );
-                      const swapCandidates =
-                        sameCategoryOptions.length > 0 ? sameCategoryOptions : options;
-                      const basePriceForDiff = st.originalPricePerPerson ?? st.pricePerPerson;
-
-                      return (
-                        <div
-                          key={st.idx}
-                          className={`px-4 py-3 ${
-                            isRemoved
-                              ? 'bg-stock-2/70'
-                              : isCustom
-                              ? 'bg-carbon-soft/60'
-                              : isModified
-                              ? 'bg-amber-soft/60'
-                              : ''
-                          }`}
-                        >
-                          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
-                            <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                              <span className="mt-0.5 inline-flex items-center gap-1 rounded border border-hairline bg-stock-2 px-2 py-0.5 text-xs font-medium text-ink-2 shrink-0">
-                                <Icon name={categoryIconName(st.category)} size={13} />
-                                {st.category}
-                              </span>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span
-                                    className={`text-sm font-semibold ${
-                                      isRemoved ? 'line-through text-ink-3' : 'text-ink'
-                                    }`}
-                                  >
-                                    {st.title}
-                                  </span>
-                                  {isModified && <span className="stamp text-amber">Đã đổi</span>}
-                                  {isRemoved && <span className="stamp text-red">Void · Đã bỏ</span>}
-                                  {isCustom && <span className="stamp text-carbon">Yêu cầu thêm</span>}
-                                </div>
-
-                                {isModified && st.originalTitle && (
-                                  <p className="text-xs text-ink-3 mt-0.5">
-                                    Thay cho mặc định:{' '}
-                                    <span className="line-through">
-                                      {st.originalTitle} ({formatVnd(st.originalPricePerPerson)}/khách)
-                                    </span>
-                                  </p>
-                                )}
-                                {isRemoved && st.originalPricePerPerson != null && (
-                                  <p className="text-xs text-red mt-0.5">
-                                    Đã trừ <span className="num">{formatVnd(st.originalPricePerPerson)}</span>/khách khỏi lịch trình chuẩn
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 shrink-0">
-                              <div className="text-right mr-1">
-                                {isRemoved ? (
-                                  <span className="num text-xs font-semibold text-ink-3">0đ</span>
-                                ) : isCustom && st.pricePerPerson === 0 ? (
-                                  <span className="text-xs font-semibold text-carbon">
-                                    Chờ Guide báo giá
-                                  </span>
-                                ) : (
-                                  <span className="num text-sm font-bold text-carbon">
-                                    {formatVnd(st.pricePerPerson)}
-                                    <span className="font-sans text-xs font-normal text-ink-3">/khách</span>
-                                  </span>
-                                )}
-                              </div>
-
-                              {!isRemoved && !isCustom && swapCandidates.length > 0 && (
-                                <button
-                                  type="button"
-                                  aria-expanded={isSwappingThis}
-                                  onClick={() => setSwappingIdx(isSwappingThis ? null : st.idx)}
-                                  className="btn btn-ghost btn-sm"
-                                >
-                                  <Icon name="swap" size={13} />
-                                  {isSwappingThis ? 'Đóng' : 'Đổi lựa chọn'}
-                                </button>
-                              )}
-
-                              {isModified && st.originalTitle && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRestoreStepToOriginal(st.idx)}
-                                  className="btn btn-ghost btn-sm"
-                                  title="Quay lại lựa chọn mặc định"
-                                >
-                                  <Icon name="undo" size={13} />
-                                  Mặc định
-                                </button>
-                              )}
-
-                              {isRemoved ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRestoreStepToOriginal(st.idx)}
-                                  className="btn btn-confirm btn-sm"
-                                >
-                                  <Icon name="undo" size={13} />
-                                  Giữ lại
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSoftRemoveOrDeleteStep(st.idx)}
-                                  className="btn btn-danger btn-sm"
-                                >
-                                  <Icon name="x" size={13} />
-                                  Bỏ mục này
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Bảng chọn dịch vụ thay thế */}
-                          {isSwappingThis && (
-                            <div className="mt-3 rounded-md border border-hairline-strong bg-stock-2 p-3 space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-semibold text-ink">
-                                  Chọn dịch vụ thay cho “{st.originalTitle || st.title}” (thay thế trực tiếp, không cộng trùng):
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setSwappingIdx(null)}
-                                  className="text-xs text-ink-3 hover:text-ink cursor-pointer"
-                                >
-                                  Đóng
-                                </button>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {swapCandidates.map((opt) => {
-                                  const diff = opt.pricePerPerson - basePriceForDiff;
-                                  const isSelected = st.title === opt.title;
-                                  return (
-                                    <button
-                                      key={opt.id}
-                                      type="button"
-                                      onClick={() => handleSwapStepWithOption(st.idx, opt)}
-                                      className={`text-left rounded-md border p-2.5 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
-                                        isSelected
-                                          ? 'border-carbon bg-carbon-soft text-ink'
-                                          : 'border-hairline bg-stock hover:border-ink-3 text-ink'
-                                      }`}
-                                    >
-                                      <div className="min-w-0">
-                                        <span className="block text-xs font-semibold truncate">{opt.title}</span>
-                                        <span className="num text-[0.72rem] text-ink-3">
-                                          {formatVnd(opt.pricePerPerson)}/khách
-                                        </span>
-                                      </div>
-                                      <span
-                                        className={`num text-xs font-bold shrink-0 ${
-                                          diff > 0 ? 'text-amber' : diff < 0 ? 'text-green' : 'text-ink-3'
-                                        }`}
-                                      >
-                                        {diff > 0 ? `+${formatVnd(diff)}` : diff < 0 ? formatVnd(diff) : '0đ'}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Cuống thêm hoạt động / yêu cầu riêng của ngày */}
-                  <div className="perf-x bg-stock-2 px-4 py-3 space-y-2.5">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="coupon-head text-[0.7rem] text-ink-3 mr-1">
-                        Thêm nhanh vào Ngày {day}:
-                      </span>
-                      {options.length > 0 && (
-                        <button
-                          type="button"
-                          aria-pressed={addingPresetDay === day}
-                          onClick={() => setAddingPresetDay(addingPresetDay === day ? null : day)}
-                          className="chip"
-                        >
-                          <Icon name="plus" size={13} />
-                          Dịch vụ có sẵn tại {tour.regionName}
-                        </button>
-                      )}
-                      {QUICK_CUSTOM_CHIPS.map((c) => (
-                        <button
-                          key={c.text}
-                          type="button"
-                          onClick={() => handleAddCustomRequestText(day, c.text)}
-                          className="chip"
-                        >
-                          <Icon name={c.icon} size={13} />
-                          {c.text}
-                        </button>
-                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenPresetDay(null);
+                          setCustomTitle('');
+                          setOpenCustomDay(isCustomOpen ? null : dayNum);
+                        }}
+                        className={`btn !py-2 !px-3.5 text-sm font-medium ${
+                          isCustomOpen ? 'btn-primary' : 'btn-ghost'
+                        }`}
+                      >
+                        <Icon name="custom" size={15} />
+                        <span>Tự nhập yêu cầu riêng</span>
+                      </button>
                     </div>
 
-                    {addingPresetDay === day && options.length > 0 && (
-                      <div className="rounded-md border border-hairline bg-stock p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-ink">
-                            Chọn dịch vụ cộng thêm vào Ngày {day}:
+                    {isPresetOpen && (
+                      <div className="rounded-lg border border-rule bg-surface p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-ink">
+                            Kho dịch vụ niêm yết tại {tour.regionName} → Thêm vào Ngày {dayNum}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setAddingPresetDay(null)}
-                            className="text-xs text-ink-3 hover:text-ink cursor-pointer"
-                          >
-                            Đóng
-                          </button>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {['ALL', 'Di chuyển', 'Khách sạn', 'Ăn uống', 'Trải nghiệm'].map(
+                              (cat) => (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  aria-pressed={presetCatFilter === cat}
+                                  onClick={() => setPresetCatFilter(cat)}
+                                  className="chip !py-1.5 !px-3 text-sm font-medium"
+                                >
+                                  {cat === 'ALL' ? 'Tất cả' : cat}
+                                </button>
+                              )
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {options.map((opt) => (
-                            <button
-                              key={opt.id}
-                              type="button"
-                              onClick={() => handleAddExtraPresetOption(day, opt)}
-                              className="chip"
-                            >
-                              <Icon name="plus" size={12} />
-                              {opt.title}
-                              <span className="num text-xs text-carbon">{formatVnd(opt.pricePerPerson)}</span>
-                            </button>
-                          ))}
-                        </div>
+
+                        {filteredRegionOptions.length === 0 ? (
+                          <div className="text-sm text-ink-3 py-2">
+                            Chưa có dịch vụ mẫu thuộc nhóm này tại {tour.regionName}.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                            {filteredRegionOptions.map((opt) => (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => addPresetOptionToDay(dayNum, opt)}
+                                className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-rule bg-surface-2 hover:border-rule-strong text-left cursor-pointer transition-colors duration-150"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <SafeImage
+                                    src={opt.imageUrl || tour.imageUrl}
+                                    alt={opt.title}
+                                    className="w-14 h-11 rounded-md object-cover border border-rule shrink-0"
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-ink truncate">
+                                      {opt.title}
+                                    </div>
+                                    <div className="text-sm text-ink-3">{opt.category}</div>
+                                  </div>
+                                </div>
+                                <span className="num text-sm font-semibold text-ink shrink-0">
+                                  +{formatVnd(opt.pricePerPerson)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    <div className="flex gap-2">
-                      <label className="sr-only" htmlFor={`custom-day-${day}`}>
-                        Yêu cầu riêng cho Ngày {day}
-                      </label>
-                      <input
-                        id={`custom-day-${day}`}
-                        type="text"
-                        value={customDraft[day] || ''}
-                        onChange={(e) => setCustomDraft((prev) => ({ ...prev, [day]: e.target.value }))}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddCustomRequestText(day, customDraft[day] || '');
-                          }
-                        }}
-                        placeholder={`Hoặc tự gõ yêu cầu riêng cho Ngày ${day} (VD: ghé chợ hải sản, thuê xe máy riêng...)`}
-                        className="field text-xs py-1.5"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleAddCustomRequestText(day, customDraft[day] || '')}
-                        className="btn btn-ghost btn-sm"
-                      >
-                        <Icon name="plus" size={14} />
-                        Thêm
-                      </button>
-                    </div>
+                    {isCustomOpen && (
+                      <div className="rounded-lg border border-rule bg-surface p-4 space-y-3">
+                        <div className="text-sm font-semibold text-ink">
+                          Yêu cầu riêng cho Ngày {dayNum} (Guide sẽ báo giá sau khi nhận)
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                          <div className="sm:col-span-3">
+                            <select
+                              value={customCat}
+                              onChange={(e) => setCustomCat(e.target.value)}
+                              aria-label="Nhóm dịch vụ yêu cầu thêm"
+                              className="field text-sm"
+                            >
+                              {CATEGORIES.map((c) => (
+                                <option key={c} value={c}>
+                                  {c}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="sm:col-span-6">
+                            <input
+                              type="text"
+                              value={customTitle}
+                              onChange={(e) => setCustomTitle(e.target.value)}
+                              placeholder="Thuê xe riêng 7 chỗ, tiệc BBQ tối..."
+                              className="field text-base"
+                            />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <button
+                              type="button"
+                              disabled={!customTitle.trim()}
+                              onClick={() => addCustomStepToDay(dayNum)}
+                              className="btn btn-primary !py-2.5 !px-3.5 text-sm font-medium w-full"
+                            >
+                              <Icon name="plus" size={15} />
+                              <span>Thêm vào Ngày {dayNum}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </section>
               );
             })}
           </div>
 
-          {/* Lời nhắn dặn dò chung */}
-          <div>
-            <label htmlFor="customer-note" className="block text-sm font-semibold text-ink mb-1">
-              Lời nhắn dặn dò gửi Guide {tour.guide.fullName} (không bắt buộc)
+          {/* Ghi chú cho Tour Guide */}
+          <section className="flagship-card p-5 space-y-2.5">
+            <label htmlFor="customer-note" className="text-sm font-semibold text-ink block">
+              Ghi chú gửi Tour Guide
             </label>
             <textarea
               id="customer-note"
               rows={2}
               value={customerNote}
               onChange={(e) => setCustomerNote(e.target.value)}
-              placeholder="VD: Đoàn có trẻ nhỏ và người lớn tuổi, nhờ Guide sắp xếp giờ giấc thư thả..."
-              className="field"
+              placeholder="Giờ bay dự kiến, yêu cầu ăn chay/ăn kiêng, trẻ nhỏ hoặc ưu tiên phòng yên tĩnh..."
+              className="field text-base"
             />
-            <p className="mt-1 text-xs text-ink-3">
-              Nếu bạn giữ nguyên lịch trình chuẩn và chỉ ghi lời nhắn dặn dò tại đây, đơn vẫn giữ nguyên giá chuẩn.
-            </p>
-          </div>
+          </section>
+        </div>
 
-          {/* Cuống tổng kết giá & nút gửi */}
-          <div className="perf-x pt-4 flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`stamp ${isModifiedFromOriginal ? 'text-amber' : 'text-green'}`}>
-                  {isModifiedFromOriginal ? 'Đã tuỳ chỉnh · Chờ báo giá' : 'Giữ lịch trình chuẩn'}
+        {/* Sticky Footer */}
+        <div className="shrink-0 px-5 py-4 border-t border-rule bg-surface-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="text-sm text-ink-2 flex flex-wrap items-center gap-x-2">
+              <span>
+                Tạm tính (<span className="num font-semibold text-ink">{guests}</span> khách ×{' '}
+                <span className="num font-semibold text-ink">{formatVnd(estPerPerson)}</span>/khách)
+              </span>
+              {groupAdjustment !== 0 && (
+                <span
+                  className={`num inline-flex items-center rounded-md px-2.5 py-0.5 text-sm font-medium ${
+                    groupAdjustment < 0
+                      ? 'bg-emerald-soft text-emerald'
+                      : 'bg-amber-soft text-amber'
+                  }`}
+                >
+                  Điều chỉnh đoàn {groupAdjustment > 0 ? '+' : ''}
+                  {formatVnd(groupAdjustment)}
                 </span>
-                {isModifiedFromOriginal && priceDiffPerPerson !== 0 && (
-                  <span className="text-xs text-ink-2">
-                    Chênh lệch tạm tính:{' '}
-                    <strong className="num text-carbon">
-                      {priceDiffPerPerson > 0 ? `+${formatVnd(priceDiffPerPerson)}` : formatVnd(priceDiffPerPerson)}
-                    </strong>
-                    /khách
-                  </span>
-                )}
-              </div>
-
-              <p className="text-lg font-bold text-ink">
-                Tạm tính:{' '}
-                <span className="num">{formatVnd(estimatedPerPerson)}</span>/khách ×{' '}
-                <span className="num">{guests}</span> khách ={' '}
-                <span className="num text-xl text-carbon">{formatVnd(estimatedTotal)}</span>
-              </p>
-
-              {hasCustomUnpriced && (
-                <p className="text-xs text-carbon">
-                  Mục bạn yêu cầu thêm sẽ được Guide {tour.guide.fullName} điền giá và gửi lại để bạn duyệt.
-                </p>
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={onClose} className="btn btn-ghost">
-                Huỷ
-              </button>
-              <button type="submit" disabled={submitting} className="btn btn-primary btn-lg">
-                <Icon name={isModifiedFromOriginal ? 'send' : 'check'} size={16} />
-                {submitting
-                  ? 'Đang gửi...'
-                  : existingBooking
-                  ? 'Lưu & gửi Guide báo giá lại'
-                  : isModifiedFromOriginal
-                  ? 'Gửi lịch trình & nhờ Guide báo giá'
-                  : 'Đặt ngay theo lịch trình chuẩn'}
-              </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="num text-2xl font-semibold text-ink">{formatVnd(estTotal)}</span>
+              {unpricedCustomCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-soft text-amber px-3 py-1 text-sm font-medium">
+                  <Icon name="alert" size={15} />
+                  <span>
+                    Có {unpricedCustomCount} yêu cầu riêng đang chờ Guide báo giá
+                  </span>
+                </span>
+              )}
             </div>
           </div>
-        </form>
+
+          <div className="flex items-center justify-end gap-2.5 shrink-0">
+            <button type="button" onClick={onClose} className="btn btn-ghost font-medium">
+              Đóng
+            </button>
+            <button
+              type="button"
+              disabled={submitting || activeSteps.length === 0}
+              onClick={handleSubmit}
+              className="btn btn-primary font-semibold"
+            >
+              <Icon name="check" size={16} />
+              <span>
+                {submitting
+                  ? 'Đang gửi...'
+                  : isPostConfirm
+                  ? 'Gửi yêu cầu điều chỉnh'
+                  : hasChanges
+                  ? 'Gửi tuỳ chỉnh cho Guide'
+                  : 'Đặt theo lịch chuẩn'}
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

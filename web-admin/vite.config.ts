@@ -16,6 +16,21 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    strictPort: true,
     host: true,
+    proxy: {
+      '/images': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    proxy: {
+      '/images': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
 })

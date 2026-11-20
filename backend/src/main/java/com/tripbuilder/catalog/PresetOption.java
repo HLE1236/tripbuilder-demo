@@ -6,8 +6,7 @@ import lombok.*;
 
 /**
  * Gợi ý dịch vụ / hoạt động có sẵn tại từng khu vực (Khách sạn, Xe, Ăn uống, Trải nghiệm).
- * Dùng để bấm chọn nhanh khi Guide tạo/sửa Tour Preset hoặc khi Khách tuỳ chỉnh lịch trình.
- * Giá tính đơn giản: VNĐ / 1 người.
+ * Giá tính theo VNĐ / 1 người.
  */
 @Entity
 @Table(name = "preset_options")
@@ -31,6 +30,9 @@ public class PresetOption {
 
     @Column(nullable = false, length = 200)
     private String title;
+
+    @Column(length = 500)
+    private String imageUrl;
 
     /** Đơn giá / 1 người (VNĐ). */
     @Column(nullable = false)

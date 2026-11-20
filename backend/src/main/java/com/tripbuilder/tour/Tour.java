@@ -10,9 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Tour Preset do Tour Guide đăng (có thể chỉnh sửa lại).
- * Lịch trình gồm các mốc hoạt động tự nhiên theo ngày (steps).
- * Giá gốc / 1 người = tổng giá của các mốc hoạt động trong lịch trình.
+ * Tour Preset do Tour Guide đăng (có hỗ trợ version để giữ nguyên snapshot đơn cũ).
  */
 @Entity
 @Table(name = "tours")
@@ -42,6 +40,10 @@ public class Tour {
     @Column(length = 500)
     private String imageUrl;
 
+    /** Danh sách ảnh gallery bổ sung (ngăn cách bằng dấu |). */
+    @Column(length = 4000)
+    private String galleryImages;
+
     @Column(name = "num_days", nullable = false)
     private Integer days;
 
@@ -49,7 +51,11 @@ public class Tour {
     @Column(nullable = false)
     private Long basePricePerPerson;
 
+    /** Phiên bản của Tour Preset (tăng khi Guide chỉnh sửa để phân biệt với đơn cũ). */
+    private Integer version;
+
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "tour", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("dayNumber ASC, sortOrder ASC, id ASC")
