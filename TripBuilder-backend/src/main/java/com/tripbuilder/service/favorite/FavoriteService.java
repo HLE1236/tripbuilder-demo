@@ -7,6 +7,7 @@ import com.tripbuilder.entity.tour.Tour;
 import com.tripbuilder.service.tour.TourService;
 import com.tripbuilder.entity.user.AppUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,11 +33,15 @@ public class FavoriteService {
     public List<Long> save(AppUser customer, Long tourId) {
         Tour tour = tourService.find(tourId);
         if (!savedTourRepository.existsByCustomerIdAndTourId(customer.getId(), tour.getId())) {
-            savedTourRepository.save(SavedTour.builder()
-                    .customer(customer)
-                    .tour(tour)
-                    .createdAt(LocalDateTime.now())
-                    .build());
+            try {
+                savedTourRepository.save(SavedTour.builder()
+                        .customer(customer)
+                        .tour(tour)
+                        .createdAt(LocalDateTime.now())
+                        .build());
+            } catch (DataIntegrityViolationException ignored) {
+                // Concurrent save on unique constraint is idempotent
+            }
         }
         return listIds(customer.getId());
     }

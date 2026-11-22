@@ -29,6 +29,9 @@ public class BookingController {
                                               @RequestParam(required = false) Long guideId,
                                               HttpServletRequest request) {
         AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() == Role.ADMIN) {
+            return ApiResponse.ok(bookingService.list(customerId, guideId));
+        }
         if (user.getRole() == Role.CUSTOMER) {
             if (guideId != null || (customerId != null && !customerId.equals(user.getId()))) {
                 throw new ForbiddenException("Bạn chỉ có thể xem đơn đặt tour của chính mình");

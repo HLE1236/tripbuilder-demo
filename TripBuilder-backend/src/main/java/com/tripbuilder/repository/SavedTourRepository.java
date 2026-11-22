@@ -16,4 +16,8 @@ public interface SavedTourRepository extends JpaRepository<SavedTour, Long> {
     boolean existsByCustomerIdAndTourId(Long customerId, Long tourId);
 
     void deleteByCustomerIdAndTourId(Long customerId, Long tourId);
+
+    void deleteByTourId(Long tourId);
+
+    void deleteByCustomerId(Long customerId);
 }

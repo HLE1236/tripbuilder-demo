@@ -1,6 +1,7 @@
 import type { PresetCategory } from '../../api';
 import {
   AlertIcon,
+  EditIcon,
   MapPinIcon,
   PlusIcon,
   TrashIcon,
@@ -21,7 +22,9 @@ export function CatalogView() {
     loading,
     error,
     modalOpen,
+    editingOption,
     openAddModal,
+    openEditModal,
     closeAddModal,
     formRegionId,
     setFormRegionId,
@@ -35,6 +38,8 @@ export function CatalogView() {
     setFormPrice,
     submitting,
     formError,
+    confirmDeleteId,
+    setConfirmDeleteId,
     deletingId,
     handleAddOption,
     handleDelete,
@@ -42,14 +47,13 @@ export function CatalogView() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-xl font-semibold text-ink">
             Quản lý Vùng &amp; Kho dịch vụ chuẩn
           </h2>
           <p className="text-sm text-ink-2 mt-0.5">
-            Chuẩn hoá danh mục PresetOption theo 6 vùng để Tour Guide và Khách hàng lựa chọn khi thiết kế lịch trình.
+            Chuẩn hoá danh mục dịch vụ theo 6 vùng để Tour Guide và Khách hàng lựa chọn khi thiết kế lịch trình.
           </p>
         </div>
 
@@ -118,10 +122,11 @@ export function CatalogView() {
               {filteredOptions.map((opt) => {
                 const region = regionMap.get(opt.regionId);
                 const cat = presetCategoryMeta(opt.category);
+                const isConfirming = confirmDeleteId === opt.id;
                 return (
                   <tr key={opt.id} className="hover:bg-surface-2/60 transition">
                     <td className="py-3 px-4 num text-xs text-ink-3">#{opt.id}</td>
-                    <td className="py-3 px-4 text-ink font-medium">
+                    <td className="py-3 px-4 text-ink font-medium whitespace-nowrap">
                       {opt.regionName || region?.name || `Vùng #${opt.regionId}`}
                     </td>
                     <td className="py-3 px-4">
@@ -135,20 +140,51 @@ export function CatalogView() {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-4 num font-medium text-ink text-right">
+                    <td className="py-3 px-4 num font-medium text-ink text-right whitespace-nowrap">
                       {formatVnd(opt.pricePerPerson)}
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        disabled={deletingId === opt.id}
-                        onClick={() => void handleDelete(opt)}
-                        className="btn btn-danger py-1.5 px-2.5 text-xs"
-                        title="Xoá dịch vụ"
-                      >
-                        <TrashIcon size={14} />
-                        <span>{deletingId === opt.id ? 'Đang xoá...' : 'Xoá'}</span>
-                      </button>
+                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                      {isConfirming ? (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={deletingId === opt.id}
+                            onClick={() => void handleDelete(opt)}
+                            className="btn btn-danger py-1 px-2.5 text-xs !bg-crimson !text-white !border-crimson"
+                          >
+                            {deletingId === opt.id ? 'Đang xoá...' : 'Xác nhận xoá'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingId === opt.id}
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="btn btn-ghost py-1 px-2.5 text-xs"
+                          >
+                            Huỷ
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(opt)}
+                            className="btn btn-ghost py-1.5 px-2.5 text-xs"
+                            title="Sửa dịch vụ"
+                          >
+                            <EditIcon size={14} />
+                            <span>Sửa</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(opt.id)}
+                            className="btn btn-danger py-1.5 px-2.5 text-xs"
+                            title="Xoá dịch vụ"
+                          >
+                            <TrashIcon size={14} />
+                            <span>Xoá</span>
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -158,23 +194,30 @@ export function CatalogView() {
         )}
       </div>
 
-      {/* Modal thêm dịch vụ mới */}
+      {/* Modal thêm / sửa dịch vụ */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={editingOption ? 'Chỉnh sửa dịch vụ trong kho' : 'Thêm dịch vụ vào kho chuẩn'}
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        >
           <div className="flagship-card w-full max-w-md p-6 space-y-5 bg-surface">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display text-lg font-semibold text-ink">
-                  Thêm dịch vụ vào kho chuẩn
+                  {editingOption ? 'Chỉnh sửa dịch vụ kho vùng' : 'Thêm dịch vụ vào kho chuẩn'}
                 </h3>
                 <p className="text-xs text-ink-2 mt-0.5">
-                  Tạo mục PresetOption mới cho vùng du lịch đã chọn.
+                  {editingOption
+                    ? `Cập nhật mục #${editingOption.id} cho vùng du lịch đã chọn.`
+                    : 'Tạo dịch vụ mới để Khách hàng và Guide sử dụng.'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeAddModal}
-                className="p-1.5 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-2"
+                className="p-1.5 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-2 cursor-pointer"
                 aria-label="Đóng"
               >
                 <XIcon size={18} />
@@ -213,7 +256,7 @@ export function CatalogView() {
                   >
                     {PRESET_CATEGORIES.map((c) => (
                       <option key={c.value} value={c.value}>
-                        {c.value} · {c.label}
+                        {c.label}
                       </option>
                     ))}
                   </select>
@@ -265,7 +308,7 @@ export function CatalogView() {
                   Huỷ
                 </button>
                 <button type="submit" disabled={submitting} className="btn btn-primary">
-                  {submitting ? 'Đang lưu...' : 'Lưu dịch vụ'}
+                  {submitting ? 'Đang lưu...' : editingOption ? 'Cập nhật dịch vụ' : 'Lưu dịch vụ'}
                 </button>
               </div>
             </form>

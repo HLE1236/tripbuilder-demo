@@ -2,6 +2,7 @@ package com.tripbuilder.service.admin;
 
 import com.tripbuilder.dto.request.admin.CreatePresetOptionRequest;
 import com.tripbuilder.dto.request.admin.CreateUserRequest;
+import com.tripbuilder.dto.request.admin.UpdateUserRequest;
 import com.tripbuilder.dto.response.admin.AdminOverviewDto;
 import com.tripbuilder.dto.response.admin.AdminPresetOptionDto;
 import com.tripbuilder.dto.response.booking.BookingDto;
@@ -17,6 +18,7 @@ import com.tripbuilder.exception.BadRequestException;
 import com.tripbuilder.repository.BookingRepository;
 import com.tripbuilder.repository.PresetOptionRepository;
 import com.tripbuilder.repository.RegionRepository;
+import com.tripbuilder.repository.SavedTourRepository;
 import com.tripbuilder.repository.TourRepository;
 import com.tripbuilder.repository.UserRepository;
 import com.tripbuilder.service.auth.AuthService;
@@ -28,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
     private final PresetOptionRepository presetOptionRepository;
+    private final SavedTourRepository savedTourRepository;
     private final TourService tourService;
     private final BookingService bookingService;
 
@@ -96,7 +100,17 @@ public class AdminService {
                 || req.role() == null) {
             throw new BadRequestException("Vui lòng nhập đầy đủ họ tên, email, mật khẩu và vai trò");
         }
+        String fullName = req.fullName().trim();
+        if (fullName.length() > 100) {
+            throw new BadRequestException("Họ tên không được vượt quá 100 ký tự");
+        }
         String email = req.email().trim();
+        if (email.length() > 100 || !AuthService.isValidEmail(email)) {
+            throw new BadRequestException("Định dạng email không hợp lệ");
+        }
+        if (req.password().length() < 6 || req.password().length() > 100) {
+            throw new BadRequestException("Mật khẩu phải có từ 6 đến 100 ký tự");
+        }
         if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
             throw new BadRequestException("Email đã được sử dụng");
         }
@@ -107,15 +121,80 @@ public class AdminService {
                     .orElseThrow(() -> new BadRequestException("Không tìm thấy khu vực ID " + req.regionId()));
         }
 
+        String avatarUrl = req.avatarUrl() != null && !req.avatarUrl().isBlank()
+                ? req.avatarUrl().trim()
+                : (req.role() == Role.GUIDE ? "/images/avatars/01-guide-minh.jpg" : "/images/avatars/05-traveler-hung.jpg");
+        String bio = req.bio() != null && !req.bio().isBlank() ? req.bio().trim() : null;
+        if (bio != null && bio.length() > 500) {
+            throw new BadRequestException("Giới thiệu không được vượt quá 500 ký tự");
+        }
+        Integer years = req.yearsExperience() != null ? Math.max(0, Math.min(60, req.yearsExperience())) : null;
+
         AppUser saved = userRepository.save(AppUser.builder()
-                .fullName(req.fullName().trim())
+                .fullName(fullName)
                 .email(email)
                 .passwordHash(AuthService.hashPassword(req.password()))
                 .phone(req.phone() != null && !req.phone().isBlank() ? req.phone().trim() : null)
                 .role(req.role())
                 .region(region)
+                .bio(bio)
+                .yearsExperience(years)
+                .avatarUrl(avatarUrl)
+                .demoAccount(false)
                 .build());
         return UserDto.from(saved);
+    }
+
+    @Transactional
+    public UserDto updateUser(Long id, UpdateUserRequest req) {
+        if (req == null || req.fullName() == null || req.fullName().isBlank()) {
+            throw new BadRequestException("Vui lòng nhập họ tên hợp lệ");
+        }
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy tài khoản ID " + id));
+
+        String fullName = req.fullName().trim();
+        if (fullName.length() > 100) {
+            throw new BadRequestException("Họ tên không được vượt quá 100 ký tự");
+        }
+        user.setFullName(fullName);
+        user.setPhone(req.phone() != null && !req.phone().isBlank() ? req.phone().trim() : null);
+
+        if (user.getRole() == Role.GUIDE) {
+            if (req.regionId() != null) {
+                Region region = regionRepository.findById(req.regionId())
+                        .orElseThrow(() -> new BadRequestException("Không tìm thấy khu vực ID " + req.regionId()));
+                user.setRegion(region);
+            }
+            if (req.bio() != null) {
+                String bio = req.bio().trim();
+                if (bio.length() > 500) {
+                    throw new BadRequestException("Giới thiệu không được vượt quá 500 ký tự");
+                }
+                user.setBio(bio.isEmpty() ? null : bio);
+            }
+            if (req.yearsExperience() != null) {
+                user.setYearsExperience(Math.max(0, Math.min(60, req.yearsExperience())));
+            }
+        }
+        return UserDto.from(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteUser(Long id, AppUser actingAdmin) {
+        if (actingAdmin != null && actingAdmin.getId().equals(id)) {
+            throw new BadRequestException("Không thể tự xoá tài khoản đang đăng nhập");
+        }
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy tài khoản ID " + id));
+        if (bookingRepository.existsByCustomerIdOrGuideId(id, id)) {
+            throw new BadRequestException("Không thể xoá tài khoản đã có đơn đặt tour liên kết");
+        }
+        if (tourRepository.existsByGuideId(id)) {
+            throw new BadRequestException("Không thể xoá Tour Guide đang sở hữu tour mẫu");
+        }
+        savedTourRepository.deleteByCustomerId(id);
+        userRepository.delete(user);
     }
 
     @Transactional(readOnly = true)
@@ -147,15 +226,66 @@ public class AdminService {
         Region region = regionRepository.findById(req.regionId())
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy khu vực ID " + req.regionId()));
 
+        String normalizedCategory = normalizePresetCategory(req.category());
+        String title = req.title().trim();
+        if (title.length() > 200) {
+            throw new BadRequestException("Tên dịch vụ không được vượt quá 200 ký tự");
+        }
+        String imageUrl = req.imageUrl() != null && !req.imageUrl().isBlank()
+                ? req.imageUrl().trim()
+                : region.getImageUrl();
+
         PresetOption saved = presetOptionRepository.save(PresetOption.builder()
                 .region(region)
-                .category(req.category().trim())
-                .title(req.title().trim())
+                .category(normalizedCategory)
+                .title(title)
                 .description(req.description() != null && !req.description().isBlank() ? req.description().trim() : null)
-                .imageUrl(req.imageUrl() != null && !req.imageUrl().isBlank() ? req.imageUrl().trim() : null)
+                .imageUrl(imageUrl)
                 .pricePerPerson(req.pricePerPerson())
                 .build());
         return AdminPresetOptionDto.from(saved);
+    }
+
+    @Transactional
+    public AdminPresetOptionDto updatePresetOption(Long id, CreatePresetOptionRequest req) {
+        if (req == null || req.regionId() == null
+                || req.category() == null || req.category().isBlank()
+                || req.title() == null || req.title().isBlank()
+                || req.pricePerPerson() == null || req.pricePerPerson() < 0) {
+            throw new BadRequestException("Vui lòng nhập đầy đủ khu vực, danh mục, tên dịch vụ và đơn giá hợp lệ");
+        }
+        PresetOption option = presetOptionRepository.findById(id)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy dịch vụ gợi ý ID " + id));
+        Region region = regionRepository.findById(req.regionId())
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy khu vực ID " + req.regionId()));
+
+        option.setRegion(region);
+        option.setCategory(normalizePresetCategory(req.category()));
+        option.setTitle(req.title().trim());
+        option.setDescription(req.description() != null && !req.description().isBlank() ? req.description().trim() : null);
+        if (req.imageUrl() != null && !req.imageUrl().isBlank()) {
+            option.setImageUrl(req.imageUrl().trim());
+        } else if (option.getImageUrl() == null || option.getImageUrl().isBlank()) {
+            option.setImageUrl(region.getImageUrl());
+        }
+        option.setPricePerPerson(req.pricePerPerson());
+        return AdminPresetOptionDto.from(presetOptionRepository.save(option));
+    }
+
+    public static String normalizePresetCategory(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new BadRequestException("Danh mục dịch vụ không được để trống");
+        }
+        String trimmed = raw.trim();
+        String upper = trimmed.toUpperCase(Locale.ROOT);
+        return switch (upper) {
+            case "HOTEL", "KHÁCH SẠN", "LƯU TRÚ" -> "Khách sạn";
+            case "FOOD", "ĂN UỐNG", "ẨM THỰC" -> "Ăn uống";
+            case "TRANSPORT", "DI CHUYỂN" -> "Di chuyển";
+            case "ACTIVITY", "TRẢI NGHIỆM" -> "Trải nghiệm";
+            default -> throw new BadRequestException(
+                    "Danh mục dịch vụ không hợp lệ (chỉ chấp nhận: Khách sạn, Ăn uống, Di chuyển, Trải nghiệm)");
+        };
     }
 
     @Transactional

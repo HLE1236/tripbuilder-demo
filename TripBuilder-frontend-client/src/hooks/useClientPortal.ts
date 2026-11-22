@@ -171,6 +171,46 @@ export function useClientPortal() {
     setPendingBookingCode(null);
   }, [bookings, pendingBookingCode, setPendingBookingCode, setSelectedBookingId, setTab]);
 
+  // Sync tab / selectedTourId / selectedBookingId with URL query params + browser Back/Forward
+  const applyingPopstateRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined') return;
+    const applyFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get('tab');
+      const urlTour = Number(params.get('tour'));
+      const urlBooking = Number(params.get('booking'));
+
+      applyingPopstateRef.current = true;
+      if (urlTab === 'explore' || urlTab === 'saved' || urlTab === 'trips') {
+        setTab(urlTab);
+      }
+      setSelectedTourId(Number.isFinite(urlTour) && urlTour > 0 ? urlTour : null);
+      setSelectedBookingId(Number.isFinite(urlBooking) && urlBooking > 0 ? urlBooking : null);
+      queueMicrotask(() => {
+        applyingPopstateRef.current = false;
+      });
+    };
+
+    window.addEventListener('popstate', applyFromUrl);
+    return () => window.removeEventListener('popstate', applyFromUrl);
+  }, [isAuthenticated, setSelectedBookingId, setSelectedTourId, setTab]);
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined' || applyingPopstateRef.current) return;
+    const params = new URLSearchParams();
+    if (tab !== 'explore') params.set('tab', tab);
+    if (selectedTourId) params.set('tour', String(selectedTourId));
+    if (selectedBookingId) params.set('booking', String(selectedBookingId));
+    const qs = params.toString();
+    const targetUrl = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+    const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+    if (targetUrl !== currentUrl) {
+      window.history.pushState({}, '', targetUrl);
+    }
+  }, [isAuthenticated, tab, selectedTourId, selectedBookingId]);
+
   const selectedRegion = useMemo(
     () => (regionFilter === 'ALL' ? null : regions.find((r) => r.id === regionFilter) ?? null),
     [regions, regionFilter]

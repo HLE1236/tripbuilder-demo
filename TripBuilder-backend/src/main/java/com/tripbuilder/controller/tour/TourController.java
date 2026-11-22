@@ -68,4 +68,15 @@ public class TourController {
         }
         return ApiResponse.ok("Đã cập nhật tour mẫu (phiên bản mới)", tourService.update(id, req, user));
     }
+
+    /** Tour Guide sở hữu hoặc Admin được xoá tour mẫu chưa có đơn đặt. */
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.GUIDE && user.getRole() != Role.ADMIN) {
+            throw new ForbiddenException("Bạn không có quyền xoá tour mẫu");
+        }
+        tourService.delete(id, user);
+        return ApiResponse.ok("Đã xoá tour mẫu", null);
+    }
 }

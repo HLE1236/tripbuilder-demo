@@ -22,10 +22,14 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final UserRepository userRepository;
 
@@ -75,23 +79,45 @@ public class AuthService {
                 || req.password() == null || req.password().isBlank()) {
             throw new BadRequestException("Vui lòng nhập đầy đủ họ tên, email và mật khẩu");
         }
+        String fullName = req.fullName().trim();
+        if (fullName.length() > 100) {
+            throw new BadRequestException("Họ tên không được vượt quá 100 ký tự");
+        }
         String email = req.email().trim();
+        if (email.length() > 100 || !isValidEmail(email)) {
+            throw new BadRequestException("Định dạng email không hợp lệ");
+        }
+        if (req.password().length() < 6 || req.password().length() > 100) {
+            throw new BadRequestException("Mật khẩu phải có từ 6 đến 100 ký tự");
+        }
+        String phone = req.phone() != null && !req.phone().isBlank() ? req.phone().trim() : null;
+        if (phone != null && phone.length() > 20) {
+            throw new BadRequestException("Số điện thoại không được vượt quá 20 ký tự");
+        }
         if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
             throw new BadRequestException("Email đã được sử dụng");
         }
         AppUser saved = userRepository.save(AppUser.builder()
-                .fullName(req.fullName().trim())
+                .fullName(fullName)
                 .email(email)
                 .passwordHash(hashPassword(req.password()))
-                .phone(req.phone() != null && !req.phone().isBlank() ? req.phone().trim() : null)
+                .phone(phone)
                 .role(Role.CUSTOMER)
                 .avatarUrl("/images/avatars/05-traveler-hung.jpg")
+                .demoAccount(false)
                 .build());
         return new AuthResponse(issueToken(saved), UserDto.from(saved));
     }
 
+    public static boolean isValidEmail(String email) {
+        return email != null && EMAIL_PATTERN.matcher(email.trim()).matches();
+    }
+
     public List<DemoAccountDto> listDemoAccounts(Role role) {
-        return userRepository.findByRoleOrderByIdAsc(role).stream()
+        if (role == null) {
+            throw new BadRequestException("Vui lòng chọn vai trò tài khoản mẫu");
+        }
+        return userRepository.findByRoleAndDemoAccountTrueOrderByIdAsc(role).stream()
                 .map(DemoAccountDto::from)
                 .toList();
     }

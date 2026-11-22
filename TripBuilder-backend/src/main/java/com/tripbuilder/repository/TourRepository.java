@@ -11,4 +11,6 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
     List<Tour> findAllByOrderByIdDesc();
 
     List<Tour> findByGuideIdOrderByIdDesc(Long guideId);
+
+    boolean existsByGuideId(Long guideId);
 }

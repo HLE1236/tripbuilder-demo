@@ -12,5 +12,7 @@ public interface UserRepository extends JpaRepository<AppUser, Long> {
 
     List<AppUser> findByRoleOrderByIdAsc(Role role);
 
+    List<AppUser> findByRoleAndDemoAccountTrueOrderByIdAsc(Role role);
+
     Optional<AppUser> findByEmailIgnoreCase(String email);
 }

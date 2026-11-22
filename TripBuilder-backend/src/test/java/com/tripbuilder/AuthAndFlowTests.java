@@ -297,10 +297,8 @@ class AuthAndFlowTests {
                         .header("Authorization", "Bearer " + badPayload + "." + sig))
                 .andExpect(status().isUnauthorized());
 
-        // 2. GET /api/users?role=CUSTOMER returns DemoAccountDto without phone
-        var customerAuth = authService.login(new LoginRequest("an.nguyen@gmail.com", "123456", Role.CUSTOMER));
-        mockMvc.perform(get("/api/users").param("role", "CUSTOMER")
-                        .header("Authorization", "Bearer " + customerAuth.token()))
+        // 2. GET /api/auth/demo-accounts?role=CUSTOMER returns DemoAccountDto without phone
+        mockMvc.perform(get("/api/auth/demo-accounts").param("role", "CUSTOMER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].email").exists())
                 .andExpect(jsonPath("$.data[0].phone").doesNotExist());
@@ -504,5 +502,76 @@ class AuthAndFlowTests {
                 .andExpect(jsonPath("$.data.totalTours").exists())
                 .andExpect(jsonPath("$.data.totalBookings").exists())
                 .andExpect(jsonPath("$.data.totalPresetOptions").exists());
+    }
+
+    @Test
+    void qaBreakerHardeningTestsPassWithout500OrSecurityLeaks() throws Exception {
+        var customerAuth = authService.login(new LoginRequest("an.nguyen@gmail.com", "123456", Role.CUSTOMER));
+        var guideAuth = authService.login(new LoginRequest("binh.guide@tripbuilder.vn", "123456", Role.GUIDE));
+        var adminAuth = authService.login(new LoginRequest("admin@tripbuilder.vn", "123456", Role.ADMIN));
+
+        // 1. Malformed JSON, invalid enum, missing query param -> 400 (never 500)
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(""))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"an.nguyen@gmail.com\",\"password\":\"123456\",\"expectedRole\":\"INVALID_ROLE\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/options"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/auth/demo-accounts"))
+                .andExpect(status().isBadRequest());
+
+        // 2. Null element in steps -> 400 (never NPE 500)
+        mockMvc.perform(post("/api/tours")
+                        .header("Authorization", "Bearer " + guideAuth.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"regionId\":1,\"title\":\"Test Null Step\",\"days\":2,\"steps\":[null]}"))
+                .andExpect(status().isBadRequest());
+
+        // 3. Registered real customer does NOT leak into demo-accounts; weak password/bad email rejected
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Bad\",\"email\":\"abc\",\"password\":\"1\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Real Privacy User\",\"email\":\"real.privacy@gmail.com\",\"password\":\"StrongPass99\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/auth/demo-accounts").param("role", "CUSTOMER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.email=='real.privacy@gmail.com')]").isEmpty());
+
+        // 4. Review rating bounds & length > 1000 -> 400
+        String over1000 = "A".repeat(1200);
+        mockMvc.perform(post("/api/bookings/4/review")
+                        .header("Authorization", "Bearer " + customerAuth.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":-999,\"review\":\"bad\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/bookings/4/review")
+                        .header("Authorization", "Bearer " + customerAuth.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":5,\"review\":\"" + over1000 + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        // 5. Category normalization: HOTEL -> "Khách sạn"
+        mockMvc.perform(post("/api/admin/preset-options")
+                        .header("Authorization", "Bearer " + adminAuth.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"regionId\":1,\"category\":\"HOTEL\",\"title\":\"Normalized Hotel Test\",\"pricePerPerson\":500000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.category").value("Khách sạn"));
+
+        // 6. Admin can list and view bookings -> 200
+        mockMvc.perform(get("/api/bookings")
+                        .header("Authorization", "Bearer " + adminAuth.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThan(0)));
+        mockMvc.perform(get("/api/bookings/1")
+                        .header("Authorization", "Bearer " + adminAuth.token()))
+                .andExpect(status().isOk());
     }
 }

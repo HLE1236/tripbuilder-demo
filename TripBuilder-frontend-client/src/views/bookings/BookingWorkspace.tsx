@@ -250,7 +250,9 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
                     Guide {booking.guide.fullName}
                   </div>
                   <div className="text-sm text-ink-2">
-                    Thổ địa · {booking.guide.yearsExperience || 5} năm kinh nghiệm
+                    {booking.guide.yearsExperience
+                      ? `Thổ địa · ${booking.guide.yearsExperience} năm kinh nghiệm`
+                      : `Hướng dẫn viên bản địa · ${booking.tour.regionName}`}
                   </div>
                   <div className="flex items-center gap-2">
                     <PhoneIcon size={15} className="text-ink-3" />

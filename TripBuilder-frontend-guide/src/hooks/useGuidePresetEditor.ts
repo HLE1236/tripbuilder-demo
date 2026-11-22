@@ -5,6 +5,7 @@ import {
   useOptionsByRegionQuery,
   useUpdateTourMutation,
 } from '@/hooks/api';
+import { useAuthStore } from '@/stores';
 import { DEFAULT_TRAVEL_IMAGE } from '@/utils/format';
 
 export interface DraftTourStep extends TourStep {
@@ -36,11 +37,16 @@ export function useGuidePresetEditor({
   editingTour,
   onSaved,
 }: UseGuidePresetEditorOptions) {
+  const user = useAuthStore((s) => s.user);
   const isEdit = Boolean(editingTour);
-  const defaultRegionCover = regions[0]?.imageUrl || DEFAULT_TRAVEL_IMAGE;
+  const matchedGuideRegion =
+    regions.find((r) => user?.regionId != null && r.id === user.regionId) ??
+    regions.find((r) => user?.regionName && r.name === user.regionName);
+  const defaultRegion = matchedGuideRegion ?? regions[0];
+  const defaultRegionCover = defaultRegion?.imageUrl || DEFAULT_TRAVEL_IMAGE;
 
   const [regionId, setRegionId] = useState(
-    String(editingTour?.regionId || regions[0]?.id || 1)
+    String(editingTour?.regionId || defaultRegion?.id || 1)
   );
   const [title, setTitle] = useState(editingTour?.title || '');
   const [description, setDescription] = useState(editingTour?.description || '');

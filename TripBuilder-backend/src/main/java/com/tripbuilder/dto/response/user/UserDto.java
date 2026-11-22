@@ -12,6 +12,7 @@ public record UserDto(
         String avatarUrl,
         String bio,
         Integer yearsExperience,
+        Long regionId,
         String regionName
 ) {
     public static UserDto from(AppUser u) {
@@ -24,6 +25,7 @@ public record UserDto(
                 u.getAvatarUrl(),
                 u.getBio(),
                 u.getYearsExperience(),
+                u.getRegion() != null ? u.getRegion().getId() : null,
                 u.getRegion() != null ? u.getRegion().getName() : null
         );
     }

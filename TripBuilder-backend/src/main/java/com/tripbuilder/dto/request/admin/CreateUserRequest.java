@@ -8,5 +8,8 @@ public record CreateUserRequest(
         String password,
         String phone,
         Role role,
-        Long regionId
+        Long regionId,
+        String bio,
+        Integer yearsExperience,
+        String avatarUrl
 ) {}

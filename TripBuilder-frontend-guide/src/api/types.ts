@@ -6,6 +6,7 @@ export interface User {
   phone: string;
   bio: string | null;
   yearsExperience: number | null;
+  regionId?: number | null;
   regionName: string | null;
   avatarUrl?: string | null;
 }

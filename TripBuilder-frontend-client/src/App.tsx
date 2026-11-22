@@ -230,7 +230,9 @@ export default function App() {
                   {tour.guide.fullName}
                 </div>
                 <div className="text-sm text-ink-3">
-                  Thổ địa {tour.guide.yearsExperience || 5} năm kinh nghiệm
+                  {tour.guide.yearsExperience
+                    ? `Thổ địa ${tour.guide.yearsExperience} năm kinh nghiệm`
+                    : `Hướng dẫn viên bản địa · ${tour.regionName}`}
                 </div>
               </div>
             </div>
@@ -416,7 +418,7 @@ export default function App() {
                     <div className="lg:col-span-5 space-y-6">
                       <div className="space-y-4">
                         <p className="text-sm font-medium text-ink-2">
-                          Lữ hành bản địa Việt Nam · 78 tư liệu ảnh thực tế
+                          Lữ hành bản địa Việt Nam · {regions.length || 6} vùng di sản &amp; lịch trình may đo
                         </p>
                         <h1 className="text-4xl lg:text-[44px] font-semibold tracking-[-0.025em] leading-[1.12] text-ink">
                           Đi theo nhịp riêng, cùng người hiểu đất

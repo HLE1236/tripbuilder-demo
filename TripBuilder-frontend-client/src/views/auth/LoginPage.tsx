@@ -192,7 +192,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                         </div>
                       </div>
 
-                      <span className="btn btn-primary !py-2 !px-4 !text-sm shrink-0">
+                      <span className="btn btn-ghost !py-1.5 !px-3.5 !text-sm shrink-0">
                         <span>{isBusy ? 'Đang vào...' : 'Khám phá'}</span>
                         <ArrowRightIcon size={15} />
                       </span>
@@ -267,7 +267,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="btn btn-ghost w-full justify-center"
+                  className="btn btn-primary w-full justify-center font-semibold"
                 >
                   <span>{loading && !switchingEmail ? 'Đang xác thực...' : 'Đăng nhập'}</span>
                   <ArrowRightIcon size={16} />

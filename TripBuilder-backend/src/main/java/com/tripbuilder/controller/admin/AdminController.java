@@ -2,6 +2,7 @@ package com.tripbuilder.controller.admin;
 
 import com.tripbuilder.dto.request.admin.CreatePresetOptionRequest;
 import com.tripbuilder.dto.request.admin.CreateUserRequest;
+import com.tripbuilder.dto.request.admin.UpdateUserRequest;
 import com.tripbuilder.dto.response.ApiResponse;
 import com.tripbuilder.dto.response.admin.AdminOverviewDto;
 import com.tripbuilder.dto.response.admin.AdminPresetOptionDto;
@@ -48,6 +49,22 @@ public class AdminController {
         return ApiResponse.ok("Đã tạo tài khoản mới", adminService.createUser(req));
     }
 
+    @PutMapping("/users/{id}")
+    public ApiResponse<UserDto> updateUser(
+            @PathVariable Long id,
+            @RequestBody UpdateUserRequest req,
+            HttpServletRequest request) {
+        requireAdmin(request);
+        return ApiResponse.ok("Đã cập nhật tài khoản", adminService.updateUser(id, req));
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ApiResponse<Void> deleteUser(@PathVariable Long id, HttpServletRequest request) {
+        AppUser admin = requireAdmin(request);
+        adminService.deleteUser(id, admin);
+        return ApiResponse.ok("Đã xoá tài khoản", null);
+    }
+
     @GetMapping("/tours")
     public ApiResponse<List<TourDto>> listTours(HttpServletRequest request) {
         requireAdmin(request);
@@ -72,6 +89,15 @@ public class AdminController {
             HttpServletRequest request) {
         requireAdmin(request);
         return ApiResponse.ok("Đã thêm dịch vụ gợi ý mới", adminService.createPresetOption(req));
+    }
+
+    @PutMapping("/preset-options/{id}")
+    public ApiResponse<AdminPresetOptionDto> updatePresetOption(
+            @PathVariable Long id,
+            @RequestBody CreatePresetOptionRequest req,
+            HttpServletRequest request) {
+        requireAdmin(request);
+        return ApiResponse.ok("Đã cập nhật dịch vụ gợi ý", adminService.updatePresetOption(id, req));
     }
 
     @DeleteMapping("/preset-options/{id}")

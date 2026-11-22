@@ -18,10 +18,10 @@ export const PRESET_CATEGORIES: {
   badgeClass: string;
   aliases: string[];
 }[] = [
-  { value: 'HOTEL', label: 'Khách sạn & Lưu trú', badgeClass: 'category-badge-hotel', aliases: ['HOTEL', 'Khách sạn'] },
-  { value: 'FOOD', label: 'Ẩm thực & Nhà hàng', badgeClass: 'category-badge-food', aliases: ['FOOD', 'Ăn uống'] },
-  { value: 'TRANSPORT', label: 'Di chuyển & Xe đưa đón', badgeClass: 'category-badge-transport', aliases: ['TRANSPORT', 'Di chuyển'] },
-  { value: 'ACTIVITY', label: 'Trải nghiệm & Tham quan', badgeClass: 'category-badge-activity', aliases: ['ACTIVITY', 'Trải nghiệm'] },
+  { value: 'Khách sạn', label: 'Khách sạn & Lưu trú', badgeClass: 'category-badge-hotel', aliases: ['HOTEL', 'Khách sạn'] },
+  { value: 'Ăn uống', label: 'Ẩm thực & Nhà hàng', badgeClass: 'category-badge-food', aliases: ['FOOD', 'Ăn uống'] },
+  { value: 'Di chuyển', label: 'Di chuyển & Xe đưa đón', badgeClass: 'category-badge-transport', aliases: ['TRANSPORT', 'Di chuyển'] },
+  { value: 'Trải nghiệm', label: 'Trải nghiệm & Tham quan', badgeClass: 'category-badge-activity', aliases: ['ACTIVITY', 'Trải nghiệm'] },
 ];
 
 export function presetCategoryMeta(category: string): {

@@ -24,6 +24,7 @@ public class AppUser {
     private String fullName;
 
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private Role role;
 
@@ -49,4 +50,9 @@ public class AppUser {
     /** Khu vực guide hoạt động chính (null với khách hàng). */
     @ManyToOne
     private Region region;
+
+    /** Đánh dấu tài khoản mẫu phục vụ chọn nhanh trên màn Login. */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean demoAccount = false;
 }

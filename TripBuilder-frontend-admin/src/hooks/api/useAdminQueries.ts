@@ -1,16 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  cancelAdminBookingApi,
   createAdminPresetOptionApi,
   createAdminUserApi,
   deleteAdminPresetOptionApi,
+  deleteAdminTourApi,
+  deleteAdminUserApi,
   getAdminBookingsApi,
   getAdminOverviewApi,
   getAdminPresetOptionsApi,
   getAdminRegionsApi,
   getAdminToursApi,
   getAdminUsersApi,
+  updateAdminPresetOptionApi,
+  updateAdminUserApi,
   type CreateAdminUserPayload,
   type CreatePresetOptionPayload,
+  type UpdateAdminUserPayload,
   type UserRole,
 } from '../../api';
 
@@ -96,6 +102,61 @@ export function useDeleteAdminPresetOptionMutation() {
     mutationFn: (id: number) => deleteAdminPresetOptionApi(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.presetOptions() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useUpdateAdminPresetOptionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: CreatePresetOptionPayload }) =>
+      updateAdminPresetOptionApi(id, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.presetOptions() });
+    },
+  });
+}
+
+export function useUpdateAdminUserMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateAdminUserPayload }) =>
+      updateAdminUserApi(id, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+    },
+  });
+}
+
+export function useDeleteAdminUserMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteAdminUserApi(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useCancelAdminBookingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => cancelAdminBookingApi(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.bookings() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useDeleteAdminTourMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteAdminTourApi(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.tours() });
       void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
     },
   });

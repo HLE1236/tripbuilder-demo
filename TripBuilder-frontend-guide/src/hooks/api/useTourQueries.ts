@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createTourApi,
+  deleteTourApi,
   getTourByIdApi,
   getToursApi,
   updateTourApi,
@@ -52,6 +53,19 @@ export function useUpdateTourMutation(guideId?: number) {
         prev ? prev.map((t) => (t.id === updated.id ? updated : t)) : [updated]
       );
       queryClient.setQueryData(tourKeys.detail(updated.id), updated);
+      void queryClient.invalidateQueries({ queryKey: tourKeys.all });
+    },
+  });
+}
+
+export function useDeleteTourMutation(guideId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tourId: number) => deleteTourApi(tourId),
+    onSuccess: (_, tourId) => {
+      queryClient.setQueryData<Tour[]>(tourKeys.list(guideId), (prev) =>
+        prev ? prev.filter((t) => t.id !== tourId) : []
+      );
       void queryClient.invalidateQueries({ queryKey: tourKeys.all });
     },
   });

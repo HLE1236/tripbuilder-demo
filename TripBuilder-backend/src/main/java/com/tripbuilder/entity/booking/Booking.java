@@ -28,6 +28,9 @@ public class Booking {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long lockVersion;
+
     @Column(length = 20)
     private String code;
 

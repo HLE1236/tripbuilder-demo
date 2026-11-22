@@ -29,23 +29,19 @@ public class HelloController {
     public ApiResponse<HelloResponse> hello() throws Exception {
         long start = System.nanoTime();
 
-        String product;
-        String version;
-        String databaseName;
         try (Connection conn = dataSource.getConnection()) {
-            DatabaseMetaData meta = conn.getMetaData();
-            product = meta.getDatabaseProductName();
-            version = meta.getDatabaseProductVersion();
-            databaseName = conn.getCatalog();
+            if (!conn.isValid(2)) {
+                throw new IllegalStateException("Database connection is not valid");
+            }
         }
         long regionCount = regionService.count();
         long latencyMs = (System.nanoTime() - start) / 1_000_000;
 
-        return ApiResponse.ok("Xin chào từ Trip Builder API 👋", new HelloResponse(
+        return ApiResponse.ok("TripBuilder API đang hoạt động", new HelloResponse(
                 "UP",
-                product,
-                version,
-                databaseName,
+                "CONNECTED",
+                null,
+                null,
                 regionCount,
                 latencyMs,
                 OffsetDateTime.now().toString()

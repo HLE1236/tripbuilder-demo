@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { setUnauthorizedHandler, type User } from '../api';
 import { useAdminUiStore, useAuthStore, useThemeStore } from '../stores';
@@ -74,6 +74,38 @@ export function useAdminPortal() {
     setBootstrapping,
     clearSession,
   ]);
+
+  const applyingPopstateRef = useRef(false);
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined') return;
+    const applyFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get('tab');
+      if (urlTab === 'overview' || urlTab === 'users' || urlTab === 'operations' || urlTab === 'catalog') {
+        applyingPopstateRef.current = true;
+        setActiveTab(urlTab);
+        queueMicrotask(() => {
+          applyingPopstateRef.current = false;
+        });
+      }
+    };
+    applyFromUrl();
+    window.addEventListener('popstate', applyFromUrl);
+    return () => window.removeEventListener('popstate', applyFromUrl);
+  }, [user, setActiveTab]);
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined' || applyingPopstateRef.current) return;
+    const params = new URLSearchParams();
+    if (activeTab !== 'overview') params.set('tab', activeTab);
+    const qs = params.toString();
+    const targetUrl = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+    const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+    if (targetUrl !== currentUrl) {
+      window.history.pushState({}, '', targetUrl);
+    }
+  }, [user, activeTab]);
 
   const handleLoginSuccess = useCallback(
     (newToken: string, loggedInUser: User) => {

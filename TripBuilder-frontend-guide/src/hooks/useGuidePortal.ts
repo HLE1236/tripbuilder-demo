@@ -7,6 +7,7 @@ import {
   bookingKeys,
   tourKeys,
   useBookingsQuery,
+  useDeleteTourMutation,
   useRegionsQuery,
   useToursQuery,
 } from '@/hooks/api';
@@ -154,6 +155,49 @@ export function useGuidePortal() {
   const regionsQuery = useRegionsQuery(isAuthenticated);
   const toursQuery = useToursQuery(user?.id, isAuthenticated);
   const bookingsQuery = useBookingsQuery(isAuthenticated);
+  const deleteTourMutation = useDeleteTourMutation(user?.id);
+  const [confirmDeleteTourId, setConfirmDeleteTourId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState('');
+
+  const applyingPopstateRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined') return;
+    const applyFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlSection = params.get('section');
+      const urlBooking = Number(params.get('booking'));
+
+      applyingPopstateRef.current = true;
+      if (urlSection === 'overview' || urlSection === 'bookings' || urlSection === 'tours') {
+        setSection(urlSection);
+      }
+      if (Number.isFinite(urlBooking) && urlBooking > 0) {
+        openBookingWorkspace(urlBooking);
+      } else {
+        closeBookingWorkspace();
+      }
+      queueMicrotask(() => {
+        applyingPopstateRef.current = false;
+      });
+    };
+
+    window.addEventListener('popstate', applyFromUrl);
+    return () => window.removeEventListener('popstate', applyFromUrl);
+  }, [isAuthenticated, setSection, openBookingWorkspace, closeBookingWorkspace]);
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined' || applyingPopstateRef.current) return;
+    const params = new URLSearchParams();
+    if (section !== 'overview') params.set('section', section);
+    if (selectedBookingId != null) params.set('booking', String(selectedBookingId));
+    const qs = params.toString();
+    const targetUrl = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+    const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+    if (targetUrl !== currentUrl) {
+      window.history.pushState({}, '', targetUrl);
+    }
+  }, [isAuthenticated, section, selectedBookingId]);
 
   const regions = regionsQuery.data ?? [];
   const tours = toursQuery.data ?? [];
@@ -176,11 +220,26 @@ export function useGuidePortal() {
     regionsQuery.error || toursQuery.error || bookingsQuery.error;
   const error =
     authError ||
+    actionError ||
     (queryError instanceof Error
       ? queryError.message
       : queryError
       ? 'Không tải được dữ liệu điều phối'
       : '');
+
+  const handleDeleteTour = useCallback(
+    async (tourId: number) => {
+      setActionError('');
+      try {
+        await deleteTourMutation.mutateAsync(tourId);
+        setConfirmDeleteTourId(null);
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Không thể xoá tour mẫu');
+        setConfirmDeleteTourId(null);
+      }
+    },
+    [deleteTourMutation]
+  );
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -326,5 +385,9 @@ export function useGuidePortal() {
     filteredBookings,
     ledgerTitle,
     updateBookingInList,
+    confirmDeleteTourId,
+    setConfirmDeleteTourId,
+    deletingTourId: deleteTourMutation.isPending ? confirmDeleteTourId : null,
+    handleDeleteTour,
   };
 }

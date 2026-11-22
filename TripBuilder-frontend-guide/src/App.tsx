@@ -78,6 +78,10 @@ export default function App() {
     filteredBookings,
     ledgerTitle,
     updateBookingInList,
+    confirmDeleteTourId,
+    setConfirmDeleteTourId,
+    deletingTourId,
+    handleDeleteTour,
   } = useGuidePortal();
 
   const renderBookingDossierList = (list: Booking[], emptyText: string) => {
@@ -232,33 +236,33 @@ export default function App() {
               {/* Studio Header nền Đen Than #0F172A, cao 68px */}
               <header className="sticky top-0 z-30 h-[68px] bg-flagship-dark text-white border-b border-white/15">
                 <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-5">
-                  <div className="flex items-center gap-5 lg:gap-8 min-w-0">
+                  <div className="flex items-center gap-3 lg:gap-5 min-w-0">
                     <button
                       type="button"
                       onClick={() => setSection('overview')}
-                      className="flex items-center gap-3 text-left cursor-pointer shrink-0"
+                      className="flex items-center gap-2.5 text-left cursor-pointer shrink-0"
                     >
-                      <span className="h-10 w-10 rounded-xl bg-coral text-white flex items-center justify-center shrink-0">
+                      <span className="h-9 w-9 rounded-xl bg-coral text-white flex items-center justify-center shrink-0">
                         <CompassIcon size={18} strokeWidth={1.5} />
                       </span>
                       <div className="leading-tight">
-                        <div className="font-display !font-semibold text-lg text-white whitespace-nowrap">
+                        <div className="font-display !font-semibold text-base lg:text-lg text-white whitespace-nowrap">
                           TripBuilder Studio
                         </div>
-                        <div className="text-[13px] font-normal text-slate-300 truncate max-w-[170px]">
+                        <div className="hidden xl:block text-[13px] font-normal text-slate-300 truncate max-w-[160px]">
                           {user.regionName || 'Điều phối Tour Guide'}
                         </div>
                       </div>
                     </button>
 
                     <nav
-                      className="flex items-center h-[68px] gap-1 lg:gap-2 overflow-x-auto no-scrollbar"
+                      className="flex items-center h-[68px] gap-1 shrink-0"
                       aria-label="Điều hướng chính"
                     >
                       <button
                         type="button"
                         onClick={() => setSection('overview')}
-                        className={`h-full px-3 inline-flex items-center gap-2 text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
+                        className={`h-full px-2.5 lg:px-3 inline-flex items-center gap-1.5 text-sm lg:text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
                           section === 'overview' && !selectedBooking
                             ? 'border-coral text-white font-semibold'
                             : 'border-transparent text-slate-300 hover:text-white'
@@ -271,7 +275,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSection('bookings')}
-                        className={`h-full px-3 inline-flex items-center gap-2 text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
+                        className={`h-full px-2.5 lg:px-3 inline-flex items-center gap-1.5 text-sm lg:text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
                           section === 'bookings' || Boolean(selectedBooking)
                             ? 'border-coral text-white font-semibold'
                             : 'border-transparent text-slate-300 hover:text-white'
@@ -289,7 +293,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSection('tours')}
-                        className={`h-full px-3 inline-flex items-center gap-2 text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
+                        className={`h-full px-2.5 lg:px-3 inline-flex items-center gap-1.5 text-sm lg:text-[15px] font-medium border-b-[3px] transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap ${
                           section === 'tours' && !selectedBooking
                             ? 'border-coral text-white font-semibold'
                             : 'border-transparent text-slate-300 hover:text-white'
@@ -378,10 +382,10 @@ export default function App() {
                     <div className="flex flex-wrap items-end justify-between gap-3">
                       <div>
                         <h1 className="font-display !font-semibold text-3xl sm:text-4xl text-ink">
-                          Điều phối báo giá &amp; lịch trình
+                          Tổng quan vận hành &amp; báo giá
                         </h1>
                         <p className="text-[15px] font-normal text-ink-2 mt-1">
-                          Điều phối viên phụ trách: {user.fullName} · {bookings.length} hồ sơ đang theo dõi
+                          Điều phối viên phụ trách: {user.fullName} · {actionQueue.length} hồ sơ cần xử lý báo giá
                         </p>
                       </div>
                       <div className="flex items-center gap-2.5">
@@ -524,15 +528,21 @@ export default function App() {
                         </button>
                       </div>
 
-                      {renderBookingDossierList(
-                        ledgerFilteredBookings,
-                        ledgerFilter === 'ACTION'
-                          ? 'Hiện không có đơn nào đang chờ xử lý'
-                          : ledgerFilter === 'REQUOTED'
-                          ? 'Chưa có đơn nào đang chờ khách duyệt báo giá'
-                          : ledgerFilter === 'ALL'
-                          ? 'Chưa có hồ sơ đặt tour nào'
-                          : 'Chưa có chuyến nào được khách chốt'
+                      {loading && bookings.length === 0 ? (
+                        <div className="flagship-card p-10 text-center text-base font-medium text-ink-2">
+                          Đang tải hồ sơ đặt tour...
+                        </div>
+                      ) : (
+                        renderBookingDossierList(
+                          ledgerFilteredBookings,
+                          ledgerFilter === 'ACTION'
+                            ? 'Hiện không có đơn nào đang chờ xử lý'
+                            : ledgerFilter === 'REQUOTED'
+                            ? 'Chưa có đơn nào đang chờ khách duyệt báo giá'
+                            : ledgerFilter === 'ALL'
+                            ? 'Chưa có hồ sơ đặt tour nào'
+                            : 'Chưa có chuyến nào được khách chốt'
+                        )
                       )}
                     </section>
                   </div>
@@ -541,10 +551,10 @@ export default function App() {
                     <div className="flex flex-wrap items-end justify-between gap-3">
                       <div>
                         <h1 className="font-display !font-semibold text-3xl text-ink">
-                          Điều phối báo giá &amp; lịch trình
+                          Sổ đơn đặt &amp; đàm phán lịch trình
                         </h1>
                         <p className="text-[15px] font-normal text-ink-2 mt-1">
-                          Điều phối viên phụ trách: {user.fullName} · {filteredBookings.length} hồ sơ đang theo dõi
+                          Tra cứu, lọc trạng thái và gửi báo giá từng chặng · {filteredBookings.length} hồ sơ
                         </p>
                       </div>
 
@@ -692,14 +702,47 @@ export default function App() {
                                     {formatVnd(tour.basePricePerPerson)}
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openTourEditor(tour)}
-                                  className="btn btn-ghost text-sm font-medium py-2 px-3.5"
-                                >
-                                  <EditIcon size={16} strokeWidth={1.5} />
-                                  <span>Sửa tour</span>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  {confirmDeleteTourId === tour.id ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={deletingTourId === tour.id}
+                                        onClick={() => void handleDeleteTour(tour.id)}
+                                        className="btn btn-danger text-sm font-medium py-1.5 px-3 !bg-crimson !text-white !border-crimson"
+                                      >
+                                        {deletingTourId === tour.id ? 'Đang xoá...' : 'Xác nhận xoá'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={deletingTourId === tour.id}
+                                        onClick={() => setConfirmDeleteTourId(null)}
+                                        className="btn btn-ghost text-sm font-medium py-1.5 px-2.5"
+                                      >
+                                        Huỷ
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteTourId(tour.id)}
+                                        className="btn btn-danger text-sm font-medium py-2 px-3"
+                                        title="Xoá tour mẫu"
+                                      >
+                                        Xoá
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openTourEditor(tour)}
+                                        className="btn btn-ghost text-sm font-medium py-2 px-3.5"
+                                      >
+                                        <EditIcon size={16} strokeWidth={1.5} />
+                                        <span>Sửa tour</span>
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </article>
                           );

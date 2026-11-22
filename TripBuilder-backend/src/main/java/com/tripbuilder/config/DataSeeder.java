@@ -262,12 +262,15 @@ public class DataSeeder implements CommandLineRunner {
     private void migrateColumns() {
         List<String> ddlStatements = List.of(
                 "ALTER TABLE tours ALTER COLUMN gallery_images NVARCHAR(4000)",
-                "ALTER TABLE tours ALTER COLUMN gallery_images VARCHAR(4000)"
+                "ALTER TABLE tours ALTER COLUMN gallery_images VARCHAR(4000)",
+                "ALTER TABLE app_users ALTER COLUMN role NVARCHAR(20)",
+                "ALTER TABLE app_users ALTER COLUMN role VARCHAR(20)",
+                "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS demo_account BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS lock_version BIGINT DEFAULT 0"
         );
         for (String sql : ddlStatements) {
             try {
                 jdbcTemplate.execute(sql);
-                return;
             } catch (Exception ignored) {
                 // Thử cú pháp tiếp theo nếu dialect DB khác
             }
@@ -678,6 +681,17 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
+    private static final java.util.Set<String> SEEDED_DEMO_EMAILS = java.util.Set.of(
+            "binh.guide@tripbuilder.vn",
+            "chi.guide@tripbuilder.vn",
+            "dung.guide@tripbuilder.vn",
+            "an.nguyen@gmail.com",
+            "hoa.do@gmail.com",
+            "khoa.hoang@gmail.com",
+            "admin@tripbuilder.vn",
+            "operator@tripbuilder.vn"
+    );
+
     private void ensureDefaultPasswords() {
         String defaultHash = AuthService.hashPassword("123456");
         List<AppUser> users = userRepository.findAll();
@@ -685,6 +699,11 @@ public class DataSeeder implements CommandLineRunner {
         for (AppUser u : users) {
             if (u.getPasswordHash() == null || u.getPasswordHash().isBlank()) {
                 u.setPasswordHash(defaultHash);
+                changed = true;
+            }
+            if (!u.isDemoAccount() && u.getEmail() != null
+                    && SEEDED_DEMO_EMAILS.contains(u.getEmail().trim().toLowerCase(Locale.ROOT))) {
+                u.setDemoAccount(true);
                 changed = true;
             }
         }
@@ -764,6 +783,7 @@ public class DataSeeder implements CommandLineRunner {
                 .bio(bio)
                 .yearsExperience(years)
                 .region(region)
+                .demoAccount(true)
                 .build());
     }
 

@@ -16,8 +16,10 @@ import com.tripbuilder.entity.user.AppUser;
 import com.tripbuilder.entity.user.Role;
 import com.tripbuilder.exception.BadRequestException;
 import com.tripbuilder.exception.ForbiddenException;
+import com.tripbuilder.repository.BookingRepository;
 import com.tripbuilder.repository.RegionPhotoRepository;
 import com.tripbuilder.repository.RegionRepository;
+import com.tripbuilder.repository.SavedTourRepository;
 import com.tripbuilder.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,8 @@ public class TourService {
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
     private final RegionPhotoRepository regionPhotoRepository;
+    private final BookingRepository bookingRepository;
+    private final SavedTourRepository savedTourRepository;
 
     @Transactional(readOnly = true)
     public List<TourDto> list(Long guideId) {
@@ -88,6 +92,9 @@ public class TourService {
 
     @Transactional
     public TourDto create(SaveTourRequest req) {
+        if (req == null) {
+            throw new BadRequestException("Dữ liệu tour không hợp lệ");
+        }
         AppUser guide = userRepository.findById(req.guideId() == null ? -1 : req.guideId())
                 .filter(u -> u.getRole() == Role.GUIDE)
                 .orElseThrow(() -> new BadRequestException("Tài khoản Tour Guide không hợp lệ"));
@@ -108,6 +115,9 @@ public class TourService {
 
     @Transactional
     public TourDto update(Long id, SaveTourRequest req, AppUser actingGuide) {
+        if (req == null) {
+            throw new BadRequestException("Dữ liệu cập nhật tour không hợp lệ");
+        }
         Tour tour = find(id);
         if (actingGuide != null && !tour.getGuide().getId().equals(actingGuide.getId())) {
             throw new ForbiddenException("Bạn chỉ có thể chỉnh sửa tour do chính mình đăng");
@@ -123,9 +133,30 @@ public class TourService {
         return toDto(tour);
     }
 
+    @Transactional
+    public void delete(Long id, AppUser actingUser) {
+        Tour tour = find(id);
+        if (actingUser != null && actingUser.getRole() != Role.ADMIN
+                && !tour.getGuide().getId().equals(actingUser.getId())) {
+            throw new ForbiddenException("Bạn chỉ có thể xoá tour do chính mình đăng");
+        }
+        if (bookingRepository.existsByTourId(id)) {
+            throw new BadRequestException("Không thể xoá tour mẫu đã có hồ sơ đặt tour của khách");
+        }
+        savedTourRepository.deleteByTourId(id);
+        tourRepository.delete(tour);
+    }
+
     private void applyFields(Tour tour, Region region, SaveTourRequest req) {
         if (req.title() == null || req.title().isBlank()) {
             throw new BadRequestException("Vui lòng nhập tên Tour");
+        }
+        String trimmedTitle = req.title().trim();
+        if (trimmedTitle.length() > 200) {
+            throw new BadRequestException("Tên tour không được vượt quá 200 ký tự");
+        }
+        if (req.description() != null && req.description().length() > 1000) {
+            throw new BadRequestException("Mô tả tour không được vượt quá 1000 ký tự");
         }
         if (req.days() < 1 || req.days() > 10) {
             throw new BadRequestException("Số ngày của tour phải từ 1 đến 10");
@@ -134,7 +165,7 @@ public class TourService {
             throw new BadRequestException("Lịch trình tour phải có ít nhất 1 hoạt động");
         }
 
-        tour.setTitle(req.title().trim());
+        tour.setTitle(trimmedTitle);
         tour.setDescription(req.description());
         String coverImg = (req.imageUrl() == null || req.imageUrl().isBlank())
                 ? region.getImageUrl()
@@ -162,9 +193,12 @@ public class TourService {
         long sum = 0;
         int order = 1;
         for (TourStepRequest s : req.steps()) {
-            if (s.title() == null || s.title().isBlank()) continue;
+            if (s == null || s.title() == null || s.title().isBlank()) continue;
+            if (s.pricePerPerson() < 0 || s.pricePerPerson() > 500_000_000L) {
+                throw new BadRequestException("Đơn giá hoạt động phải từ 0đ đến 500.000.000đ");
+            }
             int day = Math.max(1, Math.min(req.days(), s.dayNumber()));
-            long price = Math.max(0, s.pricePerPerson());
+            long price = s.pricePerPerson();
             String stepImg = (s.imageUrl() != null && !s.imageUrl().isBlank())
                     ? validateSafeImageUrl(s.imageUrl())
                     : null;

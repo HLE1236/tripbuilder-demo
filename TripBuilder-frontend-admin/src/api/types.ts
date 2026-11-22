@@ -33,7 +33,7 @@ export interface Region {
   rating: number;
 }
 
-export type PresetCategory = 'HOTEL' | 'FOOD' | 'TRANSPORT' | 'ACTIVITY';
+export type PresetCategory = 'Khách sạn' | 'Ăn uống' | 'Di chuyển' | 'Trải nghiệm';
 
 export interface PresetOption {
   id: number;
@@ -70,6 +70,15 @@ export type BookingStatus =
   | 'CONFIRMED'
   | 'CANCELLED';
 
+export interface BookingStepSummary {
+  id?: number;
+  dayNumber: number;
+  category: string;
+  title: string;
+  pricePerPerson: number;
+  noteType: string;
+}
+
 export interface Booking {
   id: number;
   code: string;
@@ -84,6 +93,9 @@ export interface Booking {
   guests: number;
   totalPrice: number;
   confirmedTotalPrice?: number | null;
+  customerNote?: string | null;
+  guideNote?: string | null;
+  steps?: BookingStepSummary[];
   createdAt: string;
   updatedAt: string;
   tour?: Tour;
@@ -111,6 +123,14 @@ export interface CreateAdminUserPayload {
   role: UserRole;
   regionId?: number;
   regionName?: string;
+  bio?: string;
+  yearsExperience?: number;
+}
+
+export interface UpdateAdminUserPayload {
+  fullName: string;
+  phone?: string;
+  regionId?: number;
   bio?: string;
   yearsExperience?: number;
 }

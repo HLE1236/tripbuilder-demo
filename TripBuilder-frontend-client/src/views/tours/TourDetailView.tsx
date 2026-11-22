@@ -151,7 +151,11 @@ export function TourDetailView({
                 <div className="space-y-1">
                   <div className="inline-flex items-center gap-2 text-sm font-medium text-ink-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
-                    <span>Thổ địa bản địa · {tour.guide.yearsExperience || 5} năm kinh nghiệm</span>
+                    <span>
+                      {tour.guide.yearsExperience
+                        ? `Thổ địa bản địa · ${tour.guide.yearsExperience} năm kinh nghiệm`
+                        : `Hướng dẫn viên bản địa · ${tour.guide.regionName || tour.province}`}
+                    </span>
                   </div>
                   <h3 className="text-xl font-semibold text-ink">
                     Guide {tour.guide.fullName}

@@ -6,29 +6,41 @@ import {
   useAdminRegionsQuery,
   useCreateAdminPresetOptionMutation,
   useDeleteAdminPresetOptionMutation,
+  useUpdateAdminPresetOptionMutation,
 } from './api/useAdminQueries';
 
 const EMPTY_REGIONS: Region[] = [];
 const EMPTY_OPTIONS: PresetOption[] = [];
 
+function normalizeCategoryValue(raw: string): PresetCategory {
+  const upper = raw.trim().toUpperCase();
+  if (upper === 'HOTEL' || raw === 'Khách sạn') return 'Khách sạn';
+  if (upper === 'FOOD' || raw === 'Ăn uống') return 'Ăn uống';
+  if (upper === 'TRANSPORT' || raw === 'Di chuyển') return 'Di chuyển';
+  return 'Trải nghiệm';
+}
+
 export function useCatalogManager() {
   const selectedRegionId = useAdminUiStore((s) => s.selectedRegionId);
   const setSelectedRegionId = useAdminUiStore((s) => s.setSelectedRegionId);
 
-  // Add service modal state
+  // Add/Edit service modal state
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingOption, setEditingOption] = useState<PresetOption | null>(null);
   const [formRegionId, setFormRegionId] = useState<string>('');
-  const [formCategory, setFormCategory] = useState<PresetCategory>('HOTEL');
+  const [formCategory, setFormCategory] = useState<PresetCategory>('Khách sạn');
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formPrice, setFormPrice] = useState('500000');
   const [formError, setFormError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const regionsQuery = useAdminRegionsQuery();
   const optionsQuery = useAdminPresetOptionsQuery();
   const createOptionMutation = useCreateAdminPresetOptionMutation();
+  const updateOptionMutation = useUpdateAdminPresetOptionMutation();
   const deleteOptionMutation = useDeleteAdminPresetOptionMutation();
 
   const regions = regionsQuery.data ?? EMPTY_REGIONS;
@@ -49,11 +61,12 @@ export function useCatalogManager() {
     formRegionId || (regions.length > 0 ? String(regions[0].id) : '');
 
   function openAddModal() {
+    setEditingOption(null);
     setFormError(null);
     setFormTitle('');
     setFormDescription('');
     setFormPrice('500000');
-    setFormCategory('HOTEL');
+    setFormCategory('Khách sạn');
     if (selectedRegionId !== 'ALL') {
       setFormRegionId(String(selectedRegionId));
     } else if (regions.length > 0) {
@@ -62,11 +75,23 @@ export function useCatalogManager() {
     setModalOpen(true);
   }
 
-  function closeAddModal() {
-    setModalOpen(false);
+  function openEditModal(opt: PresetOption) {
+    setEditingOption(opt);
+    setFormError(null);
+    setFormRegionId(String(opt.regionId));
+    setFormCategory(normalizeCategoryValue(opt.category));
+    setFormTitle(opt.title);
+    setFormDescription(opt.description || '');
+    setFormPrice(String(opt.pricePerPerson));
+    setModalOpen(true);
   }
 
-  async function handleAddOption(e: FormEvent) {
+  function closeAddModal() {
+    setModalOpen(false);
+    setEditingOption(null);
+  }
+
+  async function handleSaveOption(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
     const price = Number(formPrice);
@@ -75,17 +100,24 @@ export function useCatalogManager() {
       return;
     }
 
+    const payload = {
+      regionId: Number(effectiveFormRegionId),
+      category: formCategory,
+      title: formTitle.trim(),
+      description: formDescription.trim() || undefined,
+      pricePerPerson: price,
+    };
+
     try {
-      await createOptionMutation.mutateAsync({
-        regionId: Number(effectiveFormRegionId),
-        category: formCategory,
-        title: formTitle.trim(),
-        description: formDescription.trim() || undefined,
-        pricePerPerson: price,
-      });
+      if (editingOption) {
+        await updateOptionMutation.mutateAsync({ id: editingOption.id, payload });
+      } else {
+        await createOptionMutation.mutateAsync(payload);
+      }
       setModalOpen(false);
+      setEditingOption(null);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Không thể thêm dịch vụ mới');
+      setFormError(err instanceof Error ? err.message : 'Không thể lưu dịch vụ');
     }
   }
 
@@ -94,6 +126,7 @@ export function useCatalogManager() {
     setActionError(null);
     try {
       await deleteOptionMutation.mutateAsync(opt.id);
+      setConfirmDeleteId(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Không thể xoá dịch vụ');
     } finally {
@@ -114,7 +147,9 @@ export function useCatalogManager() {
     loading: regionsQuery.isLoading || optionsQuery.isLoading,
     error,
     modalOpen,
+    editingOption,
     openAddModal,
+    openEditModal,
     closeAddModal,
     formRegionId: effectiveFormRegionId,
     setFormRegionId,
@@ -126,10 +161,12 @@ export function useCatalogManager() {
     setFormDescription,
     formPrice,
     setFormPrice,
-    submitting: createOptionMutation.isPending,
+    submitting: createOptionMutation.isPending || updateOptionMutation.isPending,
     formError,
+    confirmDeleteId,
+    setConfirmDeleteId,
     deletingId,
-    handleAddOption,
+    handleAddOption: handleSaveOption,
     handleDelete,
   };
 }

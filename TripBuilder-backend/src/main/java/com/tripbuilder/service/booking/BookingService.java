@@ -78,6 +78,9 @@ public class BookingService {
 
     @Transactional
     public BookingDto create(CreateBookingRequest req) {
+        if (req == null) {
+            throw new BadRequestException("Dữ liệu đặt tour không hợp lệ");
+        }
         Tour tour = tourService.find(req.tourId() == null ? -1 : req.tourId());
         AppUser customer = userRepository.findById(req.customerId() == null ? -1 : req.customerId())
                 .filter(u -> u.getRole() == Role.CUSTOMER)
@@ -91,8 +94,19 @@ public class BookingService {
         if (start.isBefore(LocalDate.now())) {
             throw new BadRequestException("Ngày khởi hành không được ở trong quá khứ");
         }
+        String customerNote = trimWithMaxLength(req.customerNote(), "Ghi chú khách hàng", 1000);
         String mode = "REMOTE".equalsIgnoreCase(req.serviceMode()) ? "REMOTE" : "COMPANION";
         LocalDateTime now = LocalDateTime.now();
+
+        var recentDup = bookingRepository
+                .findFirstByCustomerIdAndTourIdAndStartDateAndDaysAndGuestsAndCreatedAtAfterOrderByIdDesc(
+                        customer.getId(), tour.getId(), start, days, guests, now.minusSeconds(5));
+        if (recentDup.isPresent()
+                && (recentDup.get().getStatus() == BookingStatus.BOOKED_ORIGINAL
+                || recentDup.get().getStatus() == BookingStatus.WAITING_REQUOTE)) {
+            return toDto(recentDup.get());
+        }
+
         int tourVer = tour.getVersion() != null ? tour.getVersion() : 1;
 
         Booking b = Booking.builder()
@@ -105,7 +119,7 @@ public class BookingService {
                 .days(days)
                 .guests(guests)
                 .serviceMode(mode)
-                .customerNote(trim(req.customerNote()))
+                .customerNote(customerNote)
                 .originalPricePerPerson(tour.getBasePricePerPerson())
                 .currentPricePerPerson(tour.getBasePricePerPerson())
                 .groupAdjustment(0L)
@@ -162,6 +176,9 @@ public class BookingService {
      */
     @Transactional
     public BookingDto customize(Long id, CustomizeRequest req, AppUser actingCustomer) {
+        if (req == null) {
+            throw new BadRequestException("Dữ liệu điều chỉnh lịch trình không hợp lệ");
+        }
         Booking b = find(id);
         if (actingCustomer != null && !b.getCustomer().getId().equals(actingCustomer.getId())) {
             throw new ForbiddenException("Bạn chỉ có thể chỉnh sửa đơn đặt tour của chính mình");
@@ -194,7 +211,7 @@ public class BookingService {
         if (req.serviceMode() != null && !req.serviceMode().isBlank()) {
             b.setServiceMode("REMOTE".equalsIgnoreCase(req.serviceMode()) ? "REMOTE" : "COMPANION");
         }
-        b.setCustomerNote(trim(req.customerNote()));
+        b.setCustomerNote(trimWithMaxLength(req.customerNote(), "Ghi chú khách hàng", 1000));
 
         List<BookingStep> previousSteps = new ArrayList<>(b.getSteps());
         long currentGroupAdj = b.getGroupAdjustment() != null ? b.getGroupAdjustment() : 0L;
@@ -243,12 +260,12 @@ public class BookingService {
         if (b.getStatus() != BookingStatus.CONFIRMED) {
             throw new BadRequestException("Chỉ có thể đánh giá sau khi chuyến đi đã được chốt");
         }
-        if (req == null) {
-            throw new BadRequestException("Vui lòng chọn số sao đánh giá");
+        if (req == null || req.rating() < 1 || req.rating() > 5) {
+            throw new BadRequestException("Số sao đánh giá phải từ 1 đến 5");
         }
-        int rating = Math.max(1, Math.min(5, req.rating()));
-        b.setCustomerRating(rating);
-        b.setCustomerReview(trim(req.review()));
+        String reviewText = trimWithMaxLength(req.review(), "Nội dung đánh giá", 1000);
+        b.setCustomerRating(req.rating());
+        b.setCustomerReview(reviewText);
         b.setUpdatedAt(LocalDateTime.now());
         bookingRepository.flush();
         return toDto(b);
@@ -259,6 +276,9 @@ public class BookingService {
      */
     @Transactional
     public BookingDto requote(Long id, RequoteRequest req, AppUser actingGuide) {
+        if (req == null) {
+            throw new BadRequestException("Dữ liệu báo giá không hợp lệ");
+        }
         Booking b = find(id);
         if (actingGuide != null && !b.getGuide().getId().equals(actingGuide.getId())) {
             throw new ForbiddenException("Bạn chỉ có thể báo giá cho đơn thuộc tour của mình");
@@ -282,7 +302,7 @@ public class BookingService {
         long groupAdjustment = req.groupAdjustment() != null
                 ? req.groupAdjustment()
                 : (b.getGroupAdjustment() != null ? b.getGroupAdjustment() : 0L);
-        b.setGuideNote(trim(req.guideNote()));
+        b.setGuideNote(trimWithMaxLength(req.guideNote(), "Ghi chú của Tour Guide", 1000));
 
         List<BookingStep> previousSteps = new ArrayList<>(b.getSteps());
         applySteps(b, req.steps(), days, guests, groupAdjustment, Role.GUIDE, previousSteps);
@@ -381,6 +401,9 @@ public class BookingService {
     // ===================== Helpers =====================
 
     private boolean canView(Booking b, AppUser user) {
+        if (user.getRole() == Role.ADMIN) {
+            return true;
+        }
         return b.getCustomer().getId().equals(user.getId()) || b.getGuide().getId().equals(user.getId());
     }
 
@@ -490,7 +513,7 @@ public class BookingService {
             throw new BadRequestException("Lịch trình phải có ít nhất 1 hoạt động");
         }
         int maxDayInSteps = inputs.stream()
-                .filter(s -> s.title() != null && !s.title().isBlank())
+                .filter(s -> s != null && s.title() != null && !s.title().isBlank())
                 .mapToInt(BookingStepRequest::dayNumber)
                 .max()
                 .orElse(days);
@@ -508,8 +531,11 @@ public class BookingService {
         int order = 1;
 
         for (BookingStepRequest s : inputs) {
-            if (s.title() == null || s.title().isBlank()) continue;
+            if (s == null || s.title() == null || s.title().isBlank()) continue;
             if (s.dayNumber() < 1 || s.dayNumber() > effectiveDays) continue;
+            if (s.pricePerPerson() < 0 || s.pricePerPerson() > 500_000_000L) {
+                throw new BadRequestException("Đơn giá hạng mục phải từ 0đ đến 500.000.000đ");
+            }
 
             String title = s.title().trim();
             String rawNoteType = (s.noteType() == null || s.noteType().isBlank())
@@ -702,6 +728,14 @@ public class BookingService {
 
     private static String trim(String s) {
         return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    private static String trimWithMaxLength(String s, String fieldLabel, int maxLen) {
+        String trimmed = trim(s);
+        if (trimmed != null && trimmed.length() > maxLen) {
+            throw new BadRequestException(fieldLabel + " không được vượt quá " + maxLen + " ký tự");
+        }
+        return trimmed;
     }
 
     private BookingDto toDto(Booking b) {

@@ -144,7 +144,7 @@ export function App() {
                   </div>
                   <div className="num text-[11px] text-ink-3 leading-tight">{user.email}</div>
                 </div>
-                <span className="tag tag-terracotta text-xs">ADMIN</span>
+                <span className="tag tag-terracotta text-xs">Quản trị viên</span>
               </div>
 
               <button
