@@ -1,3 +1,5 @@
+> **Lưu ý:** Tài liệu lịch sử từ giai đoạn tái cấu trúc ban đầu. Bản đồ thư mục và hướng dẫn điều phối subagent cập nhật mới nhất xem tại [AGENTS.md](AGENTS.md) và [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md).
+
 # Kế Hoạch Chính Thức: Tái Cấu Trúc Thư Mục & Mở Rộng 3 Cổng Giao Diện (Chuẩn CNPM)
 
 > **Dự án:** TripBuilder (`Project1_demo`)  

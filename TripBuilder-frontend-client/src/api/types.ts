@@ -10,13 +10,44 @@ export interface User {
   avatarUrl?: string | null;
 }
 
-export interface DemoAccount {
-  id: number;
+export interface AuthResponse {
+  token: string;
+  refreshToken: string;
+  expiresInSeconds: number;
+  user: User;
+}
+
+export interface RegisterPayload {
   fullName: string;
-  role: 'CUSTOMER' | 'GUIDE' | 'ADMIN';
   email: string;
-  avatarUrl: string | null;
-  regionName: string | null;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+  acceptedTerms: boolean;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+  devOtp?: string | null;
+}
+
+export interface ResetPasswordPayload {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface UpdateProfilePayload {
+  fullName: string;
+  phone?: string;
+  avatarUrl?: string | null;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 export interface PhotoItem {
@@ -59,6 +90,14 @@ export interface TourStep {
   pricePerPerson: number;
 }
 
+export interface TourReview {
+  bookingCode: string;
+  customerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 export interface Tour {
   id: number;
   title: string;
@@ -69,6 +108,10 @@ export interface Tour {
   days: number;
   basePricePerPerson: number;
   version: number;
+  active?: boolean;
+  averageRating?: number | null;
+  reviewCount?: number;
+  reviews?: TourReview[];
   regionId: number;
   regionName: string;
   province: string;
@@ -77,6 +120,8 @@ export interface Tour {
   updatedAt: string;
   steps: TourStep[];
 }
+
+export type TourResponse = Tour;
 
 export interface TourFilterParams {
   regionId?: number;
@@ -92,6 +137,7 @@ export type BookingStatus =
   | 'REQUOTED'
   | 'CHANGE_REQUESTED'
   | 'CONFIRMED'
+  | 'COMPLETED'
   | 'CANCELLED';
 
 export interface BookingStep {
@@ -134,6 +180,8 @@ export interface Booking {
   startDate: string;
   days: number;
   guests: number;
+  adults?: number | null;
+  children?: number | null;
   serviceMode?: ServiceMode | string | null;
   customerNote: string | null;
   guideNote: string | null;
@@ -147,8 +195,31 @@ export interface Booking {
   confirmedTotalPrice?: number | null;
   revisionCount: number;
   postConfirmAdjustment: boolean;
+  guideAccepted?: boolean;
+  depositPercent?: number | null;
+  depositAmount?: number | null;
+  depositPaid?: boolean;
+  cancelReason?: string | null;
+  hasConfirmedSnapshot?: boolean;
   createdAt: string;
   updatedAt: string;
   steps: BookingStep[];
   revisions: BookingRevision[];
+}
+
+export type BookingResponse = Booking;
+
+export interface NotificationItem {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  relatedBookingId: number | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  unreadCount: number;
+  items: NotificationItem[];
 }

@@ -26,7 +26,14 @@ export function useMeQuery(enabled: boolean) {
 
 export function useLoginMutation() {
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      loginApi(email, password),
+    mutationFn: ({
+      email,
+      password,
+      rememberMe = false,
+    }: {
+      email: string;
+      password: string;
+      rememberMe?: boolean;
+    }) => loginApi(email, password, rememberMe),
   });
 }

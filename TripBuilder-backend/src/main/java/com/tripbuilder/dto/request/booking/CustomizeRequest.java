@@ -7,7 +7,20 @@ public record CustomizeRequest(
         LocalDate startDate,
         Integer days,
         Integer guests,
+        Integer adults,
+        Integer children,
         String serviceMode,
         String customerNote,
         List<BookingStepRequest> steps
-) {}
+) {
+    public CustomizeRequest(
+            LocalDate startDate,
+            Integer days,
+            Integer guests,
+            String serviceMode,
+            String customerNote,
+            List<BookingStepRequest> steps
+    ) {
+        this(startDate, days, guests, null, null, serviceMode, customerNote, steps);
+    }
+}

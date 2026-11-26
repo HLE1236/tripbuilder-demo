@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { CreateBookingPayload } from '../api/booking';
 import type {
   Booking,
   BookingStep,
@@ -21,10 +22,10 @@ export interface LocalStep extends BookingStep {
   };
 }
 
-function getLocalTodayIso(): string {
-  const now = new Date();
-  const offsetMs = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+function getLocalTomorrowIso(): string {
+  const tomorrow = new Date(Date.now() + 86400_000);
+  const offsetMs = tomorrow.getTimezoneOffset() * 60_000;
+  return new Date(tomorrow.getTime() - offsetMs).toISOString().slice(0, 10);
 }
 
 function getDefaultStartDate(): string {
@@ -42,17 +43,21 @@ function nextUid(): string {
 export interface UseCustomerCustomizeParams {
   tour: Tour;
   customerId: number;
+  isAuthenticated?: boolean;
   existingBooking?: Booking | null;
   onSuccess: (booking: Booking) => void;
+  onRequireAuth?: (draft: Omit<CreateBookingPayload, 'customerId'>) => void;
 }
 
 export function useCustomerCustomize({
   tour,
   customerId,
+  isAuthenticated = true,
   existingBooking,
   onSuccess,
+  onRequireAuth,
 }: UseCustomerCustomizeParams) {
-  const todayStr = useMemo(() => getLocalTodayIso(), []);
+  const tomorrowStr = useMemo(() => getLocalTomorrowIso(), []);
   const isPostConfirm =
     existingBooking?.status === 'CONFIRMED' || existingBooking?.status === 'CHANGE_REQUESTED';
 
@@ -60,10 +65,14 @@ export function useCustomerCustomize({
     existingBooking?.startDate || getDefaultStartDate()
   );
   const [days, setDays] = useState(existingBooking?.days || tour.days);
-  const [guests, setGuests] = useState(existingBooking?.guests || 2);
-  const [serviceMode, setServiceMode] = useState<ServiceMode>(
-    existingBooking?.serviceMode === 'REMOTE' ? 'REMOTE' : 'COMPANION'
+  const [adults, setAdults] = useState(
+    existingBooking?.adults ?? existingBooking?.guests ?? 2
   );
+  const [children, setChildren] = useState(existingBooking?.children ?? 0);
+  const guests = adults + children;
+  const initialMode: ServiceMode = existingBooking?.serviceMode === 'REMOTE' ? 'REMOTE' : 'COMPANION';
+  const initialNote = (existingBooking?.customerNote || '').trim();
+  const [serviceMode, setServiceMode] = useState<ServiceMode>(initialMode);
   const [customerNote, setCustomerNote] = useState(existingBooking?.customerNote || '');
 
   const [steps, setSteps] = useState<LocalStep[]>(() =>
@@ -106,10 +115,30 @@ export function useCustomerCustomize({
   const estTotal = Math.max(0, estPerPerson * guests + groupAdjustment);
 
   const hasChanges =
-    days !== tour.days ||
+    days !== (existingBooking?.days ?? tour.days) ||
     steps.some((s) => s.noteType !== 'PRESET') ||
+    serviceMode !== initialMode ||
+    customerNote.trim() !== initialNote ||
     existingBooking?.status === 'REQUOTED' ||
     isPostConfirm;
+
+  const itineraryWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    for (let d = 1; d <= days; d += 1) {
+      const dayActive = activeSteps.filter((s) => s.dayNumber === d);
+      if (days > 1 && dayActive.length === 0) {
+        warnings.push(`Ngày ${d} hiện đang trống, chưa có hoạt động nào.`);
+      }
+      if (dayActive.length > 4) {
+        warnings.push(`Ngày ${d} đang có ${dayActive.length} hoạt động, lịch trình có thể hơi dày.`);
+      }
+      const hotelCount = dayActive.filter((s) => s.category === 'Khách sạn').length;
+      if (hotelCount > 1) {
+        warnings.push(`Ngày ${d} đang có ${hotelCount} mục khách sạn/lưu trú.`);
+      }
+    }
+    return warnings;
+  }, [activeSteps, days]);
 
   const swapStepWithOption = (uid: string, opt: PresetOption) => {
     setSteps((prev) =>
@@ -314,6 +343,10 @@ export function useCustomerCustomize({
 
   const handleSubmit = async () => {
     setError('');
+    if (startDate < tomorrowStr) {
+      setError('Ngày khởi hành phải cách hiện tại ít nhất 24 giờ (từ ngày mai trở đi).');
+      return;
+    }
     if (activeSteps.length === 0) {
       setError('Lịch trình phải có ít nhất 1 hoạt động chưa bị bỏ.');
       return;
@@ -323,19 +356,35 @@ export function useCustomerCustomize({
       return;
     }
 
-    try {
-      const payloadSteps: BookingStep[] = steps.map((s) => ({
-        id: s.id,
-        dayNumber: Math.min(Math.max(1, s.dayNumber), days),
-        category: s.category,
-        title: s.title,
-        imageUrl: s.imageUrl,
-        pricePerPerson: s.pricePerPerson,
-        originalTitle: s.originalTitle,
-        originalPricePerPerson: s.originalPricePerPerson,
-        noteType: s.noteType,
-      }));
+    const payloadSteps: BookingStep[] = steps.map((s) => ({
+      id: s.id,
+      dayNumber: Math.min(Math.max(1, s.dayNumber), days),
+      category: s.category,
+      title: s.title,
+      imageUrl: s.imageUrl,
+      pricePerPerson: s.pricePerPerson,
+      originalTitle: s.originalTitle,
+      originalPricePerPerson: s.originalPricePerPerson,
+      noteType: s.noteType,
+    }));
 
+    if (!existingBooking && !isAuthenticated && onRequireAuth) {
+      onRequireAuth({
+        tourId: tour.id,
+        startDate,
+        days,
+        guests,
+        adults,
+        children,
+        serviceMode,
+        customerNote,
+        customized: hasChanges,
+        steps: payloadSteps,
+      });
+      return;
+    }
+
+    try {
       const saved = existingBooking
         ? await customizeBookingMutation.mutateAsync({
             bookingId: existingBooking.id,
@@ -343,6 +392,8 @@ export function useCustomerCustomize({
               startDate,
               days,
               guests,
+              adults,
+              children,
               serviceMode,
               customerNote,
               steps: payloadSteps,
@@ -354,6 +405,8 @@ export function useCustomerCustomize({
             startDate,
             days,
             guests,
+            adults,
+            children,
             serviceMode,
             customerNote,
             customized: hasChanges,
@@ -372,13 +425,16 @@ export function useCustomerCustomize({
       : 0;
 
   return {
-    todayStr,
+    tomorrowStr,
     isPostConfirm,
     startDate,
     setStartDate,
     days,
     guests,
-    setGuests,
+    adults,
+    setAdults,
+    children,
+    setChildren,
     serviceMode,
     setServiceMode,
     customerNote,
@@ -406,6 +462,7 @@ export function useCustomerCustomize({
     groupAdjustment,
     estTotal,
     hasChanges,
+    itineraryWarnings,
     dayList,
     affectedCount,
     swapStepWithOption,

@@ -6,6 +6,7 @@ import {
   customizeBookingApi,
   getBookingByIdApi,
   getBookingsApi,
+  rejectBookingChangeApi,
   reviewBookingApi,
   type CreateBookingPayload,
   type CustomizeBookingPayload,
@@ -91,7 +92,20 @@ export function useCancelBookingMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (bookingId: number) => cancelBookingApi(bookingId),
+    mutationFn: ({ bookingId, reason }: { bookingId: number; reason?: string }) =>
+      cancelBookingApi(bookingId, reason),
+    onSuccess: (updated) => {
+      syncBookingInCache(queryClient, updated);
+      queryClient.invalidateQueries({ queryKey: bookingKeys.list() });
+    },
+  });
+}
+
+export function useRejectBookingChangeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (bookingId: number) => rejectBookingChangeApi(bookingId),
     onSuccess: (updated) => {
       syncBookingInCache(queryClient, updated);
       queryClient.invalidateQueries({ queryKey: bookingKeys.list() });

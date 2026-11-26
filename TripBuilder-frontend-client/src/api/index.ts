@@ -7,12 +7,18 @@ export * from './booking';
 export * from './favorite';
 export * from './region';
 export * from './option';
+export * from './notification';
 
-export { getAuthToken, setAuthToken } from '../config/storage/auth-storage';
+export {
+  clearAuthStorage,
+  getAuthToken,
+  getRefreshToken,
+  getRememberMe,
+  setAuthToken,
+  setAuthTokens,
+} from '../config/storage/auth-storage';
 export { DEFAULT_TRAVEL_IMAGE, formatVnd, resolveMediaUrl } from '../utils/format';
 export {
-  ADMIN_PORT_URL,
-  GUIDE_PORT_URL,
   noteTypeMeta,
   serviceModeMeta,
   statusMeta,

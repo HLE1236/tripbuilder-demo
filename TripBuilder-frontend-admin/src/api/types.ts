@@ -13,6 +13,13 @@ export interface User {
   avatarUrl?: string | null;
 }
 
+export interface AuthResponse {
+  token: string;
+  refreshToken: string;
+  expiresInSeconds: number;
+  user: User;
+}
+
 export interface DemoAccount {
   id: number;
   fullName: string;
@@ -54,6 +61,9 @@ export interface Tour {
   days: number;
   basePricePerPerson: number;
   version: number;
+  active: boolean;
+  averageRating: number | null;
+  reviewCount: number;
   regionId: number;
   regionName: string;
   province: string;
@@ -65,9 +75,10 @@ export interface Tour {
 export type BookingStatus =
   | 'BOOKED_ORIGINAL'
   | 'WAITING_REQUOTE'
-  | 'REQUOTED'
   | 'CHANGE_REQUESTED'
+  | 'REQUOTED'
   | 'CONFIRMED'
+  | 'COMPLETED'
   | 'CANCELLED';
 
 export interface BookingStepSummary {
@@ -91,6 +102,14 @@ export interface Booking {
   startDate: string;
   days: number;
   guests: number;
+  adults?: number;
+  children?: number;
+  guideAccepted?: boolean;
+  depositPercent?: number;
+  depositAmount?: number;
+  depositPaid?: boolean;
+  cancelReason?: string | null;
+  hasConfirmedSnapshot?: boolean;
   totalPrice: number;
   confirmedTotalPrice?: number | null;
   customerNote?: string | null;
@@ -103,16 +122,51 @@ export interface Booking {
 
 export interface AdminOverview {
   totalRevenue: number;
+  collectedDeposit: number;
   totalBookings: number;
   waitingRequoteBookings: number;
   requotedBookings: number;
   confirmedBookings: number;
-  cancelledBookings?: number;
+  completedBookings: number;
+  cancelledBookings: number;
   totalTours: number;
   totalCustomers: number;
   totalGuides: number;
   totalRegions: number;
   totalPresetOptions: number;
+  pendingGuideApplications?: number;
+}
+
+export type GuideApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface GuideApplication {
+  id: number;
+  applicationCode: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  regionId: number;
+  regionName: string;
+  province: string;
+  yearsExperience: number | null;
+  licenseNumber: string | null;
+  languages: string | null;
+  bio: string;
+  status: GuideApplicationStatus;
+  reviewNote: string | null;
+  reviewedByName: string | null;
+  createdUserId: number | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export interface ApproveGuideApplicationPayload {
+  regionId?: number;
+  reviewNote?: string;
+}
+
+export interface RejectGuideApplicationPayload {
+  reviewNote: string;
 }
 
 export interface CreateAdminUserPayload {

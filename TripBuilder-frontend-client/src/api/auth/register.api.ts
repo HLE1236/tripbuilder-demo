@@ -1,19 +1,14 @@
 import { apiClient } from '../client';
-import type { AuthSessionResponse } from './login.api';
+import type { AuthResponse, RegisterPayload } from '../types';
 
-export interface RegisterPayload {
-  fullName: string;
-  email: string;
-  phone?: string;
-  password: string;
-}
-
-export async function registerApi(payload: RegisterPayload): Promise<AuthSessionResponse> {
+export async function registerApi(payload: RegisterPayload): Promise<AuthResponse> {
   const res = await apiClient.post('/api/auth/register', {
     fullName: payload.fullName.trim(),
     email: payload.email.trim(),
-    phone: payload.phone?.trim() || undefined,
+    phone: payload.phone.trim(),
     password: payload.password,
+    confirmPassword: payload.confirmPassword,
+    acceptedTerms: payload.acceptedTerms,
   });
   return res.data.data;
 }

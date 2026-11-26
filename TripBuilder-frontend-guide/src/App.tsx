@@ -26,6 +26,7 @@ import {
   UsersIcon,
   XIcon,
 } from '@/components/icon';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { noteTypeMeta, serviceModeMeta, statusMeta } from '@/config/constants/meta';
 import { tripBuilderAdminTheme } from '@/config/theme';
@@ -72,6 +73,7 @@ export default function App() {
     actionQueue,
     requotedList,
     confirmedList,
+    completedList,
     cancelledList,
     confirmedRevenue,
     ledgerFilteredBookings,
@@ -82,6 +84,8 @@ export default function App() {
     setConfirmDeleteTourId,
     deletingTourId,
     handleDeleteTour,
+    togglingTourId,
+    handleToggleTourStatus,
   } = useGuidePortal();
 
   const renderBookingDossierList = (list: Booking[], emptyText: string) => {
@@ -230,7 +234,7 @@ export default function App() {
               Đang kiểm tra phiên Tour Guide
             </div>
           ) : !user ? (
-            <LoginPage onSuccess={(token, loggedInUser) => setSession(token, loggedInUser)} />
+            <LoginPage onSuccess={(auth, rememberMe) => setSession(auth, rememberMe)} />
           ) : (
             <>
               {/* Studio Header nền Đen Than #0F172A, cao 68px */}
@@ -328,6 +332,11 @@ export default function App() {
                         {user.fullName}
                       </span>
                     </div>
+
+                    <NotificationBell
+                      enabled={Boolean(user)}
+                      onOpenBooking={openBookingWorkspace}
+                    />
 
                     <button
                       type="button"
@@ -592,6 +601,7 @@ export default function App() {
                           { key: 'ACTION', label: `Cần xử lý (${actionQueue.length})` },
                           { key: 'REQUOTED', label: `Đã gửi giá (${requotedList.length})` },
                           { key: 'CONFIRMED', label: `Đã chốt (${confirmedList.length})` },
+                          { key: 'COMPLETED', label: `Đã hoàn thành (${completedList.length})` },
                           { key: 'CANCELLED', label: `Đã hủy (${cancelledList.length})` },
                         ] as { key: BookingFilter; label: string }[]
                       ).map((item) => (
@@ -662,11 +672,18 @@ export default function App() {
                                 <SafeImage
                                   src={tour.imageUrl}
                                   alt={tour.title}
-                                  className="w-full h-full object-cover"
+                                  className={`w-full h-full object-cover ${
+                                    tour.active === false ? 'opacity-65 grayscale-[30%]' : ''
+                                  }`}
                                 />
                                 <span className="num absolute top-3 left-3 rounded-lg bg-[#0F172A]/90 text-white px-3 py-1 text-[13px] font-medium">
                                   v{tour.version} · {tour.days}N
                                 </span>
+                                {tour.active === false && (
+                                  <span className="absolute bottom-3 left-3 rounded-lg bg-amber text-white px-2.5 py-1 text-[12px] font-semibold shadow-sm">
+                                    Đang tạm ẩn
+                                  </span>
+                                )}
                                 <span className="num absolute top-3 right-3 rounded-lg bg-black/75 text-white px-2.5 py-1 text-[13px] font-medium inline-flex items-center gap-1.5">
                                   <ImageIcon size={14} strokeWidth={1.5} />
                                   {photoCount} ảnh
@@ -726,6 +743,23 @@ export default function App() {
                                     <>
                                       <button
                                         type="button"
+                                        disabled={togglingTourId === tour.id}
+                                        onClick={() => void handleToggleTourStatus(tour)}
+                                        className="btn btn-ghost text-sm font-medium py-2 px-3"
+                                        title={
+                                          tour.active === false
+                                            ? 'Mở bán lại tour này'
+                                            : 'Tạm ẩn tour này khỏi danh sách công khai'
+                                        }
+                                      >
+                                        {togglingTourId === tour.id
+                                          ? 'Đang cập nhật...'
+                                          : tour.active === false
+                                          ? 'Mở bán lại'
+                                          : 'Tạm ẩn'}
+                                      </button>
+                                      <button
+                                        type="button"
                                         onClick={() => setConfirmDeleteTourId(tour.id)}
                                         className="btn btn-danger text-sm font-medium py-2 px-3"
                                         title="Xoá tour mẫu"
@@ -776,13 +810,29 @@ export default function App() {
                 content={
                   <div className="p-5 space-y-4 overflow-y-auto bg-canvas">
                     <div className="bg-surface-2 p-4 rounded-xl border border-rule flex items-center justify-between gap-2">
-                      <span
-                        className={`tag normal-case tracking-normal font-medium ${
-                          statusMeta(drawerBooking.status).tagClass
-                        }`}
-                      >
-                        {statusMeta(drawerBooking.status).short}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`tag normal-case tracking-normal font-medium ${
+                            statusMeta(drawerBooking.status).tagClass
+                          }`}
+                        >
+                          {statusMeta(drawerBooking.status).short}
+                        </span>
+                        {(drawerBooking.status === 'CONFIRMED' ||
+                          drawerBooking.status === 'COMPLETED') &&
+                          drawerBooking.depositAmount != null &&
+                          drawerBooking.depositAmount > 0 && (
+                            <span
+                              className={`tag normal-case tracking-normal font-medium ${
+                                drawerBooking.depositPaid ? 'tag-forest' : 'tag-ochre'
+                              }`}
+                            >
+                              {drawerBooking.depositPaid
+                                ? `Đã cọc ${formatVnd(drawerBooking.depositAmount)}`
+                                : `Chờ cọc ${formatVnd(drawerBooking.depositAmount)}`}
+                            </span>
+                          )}
+                      </div>
                       <div className="text-right">
                         <div className="text-[13px] font-medium text-ink-3">Tổng báo giá</div>
                         <div className="num text-xl font-semibold text-coral">
@@ -809,6 +859,12 @@ export default function App() {
                         <div className="num font-semibold text-ink mt-1">
                           {drawerBooking.guests} khách
                         </div>
+                        {drawerBooking.adults != null && (
+                          <div className="text-[12px] text-ink-3 mt-0.5">
+                            {drawerBooking.adults} NL
+                            {drawerBooking.children ? `, ${drawerBooking.children} TE` : ''}
+                          </div>
+                        )}
                       </div>
                     </div>
 

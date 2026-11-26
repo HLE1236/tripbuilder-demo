@@ -54,6 +54,10 @@ public class Tour {
     /** Phiên bản của Tour Preset (tăng khi Guide chỉnh sửa để phân biệt với đơn cũ). */
     private Integer version;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean active = true;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

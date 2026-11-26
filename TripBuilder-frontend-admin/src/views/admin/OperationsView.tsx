@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   AlertIcon,
   ClipboardIcon,
@@ -10,12 +11,26 @@ import {
 import { SafeImage } from '../../components/ui/SafeImage';
 import { bookingStatusMeta } from '../../config/constants/meta';
 import { useOperationsManager } from '../../hooks';
-import { formatDateTime, formatVnd } from '../../utils/format';
+import type { BookingStatusFilter } from '../../stores';
+import { formatDate, formatVnd } from '../../utils/format';
+
+const BOOKING_STATUS_FILTERS: { value: BookingStatusFilter; label: string }[] = [
+  { value: 'ALL', label: 'Tất cả' },
+  { value: 'BOOKED_ORIGINAL', label: 'Lịch chuẩn' },
+  { value: 'WAITING_REQUOTE', label: 'Chờ báo giá' },
+  { value: 'CHANGE_REQUESTED', label: 'Xin đổi sau chốt' },
+  { value: 'REQUOTED', label: 'Đã gửi giá' },
+  { value: 'CONFIRMED', label: 'Đã chốt' },
+  { value: 'COMPLETED', label: 'Hoàn thành' },
+  { value: 'CANCELLED', label: 'Đã huỷ' },
+];
 
 export function OperationsView() {
   const {
     subTab,
     setSubTab,
+    bookingStatusFilter,
+    setBookingStatusFilter,
     search,
     setSearch,
     bookings,
@@ -23,12 +38,23 @@ export function OperationsView() {
     filteredBookings,
     filteredTours,
     selectedBooking,
+    guideOptionsForSelectedBooking,
+    reassignGuideId,
+    setReassignGuideId,
+    reassigningGuide,
+    handleReassignGuide,
+    completingBooking,
+    handleCompleteSelectedBooking,
     openBookingDetail,
     closeBookingDetail,
     confirmCancelBooking,
     setConfirmCancelBooking,
+    cancelReason,
+    setCancelReason,
     cancellingBooking,
     handleCancelSelectedBooking,
+    togglingTourId,
+    handleToggleTourStatus,
     confirmDeleteTourId,
     setConfirmDeleteTourId,
     deletingTourId,
@@ -38,6 +64,17 @@ export function OperationsView() {
     error,
     refreshAll,
   } = useOperationsManager();
+
+  useEffect(() => {
+    if (!selectedBooking) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeBookingDetail();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedBooking, closeBookingDetail]);
 
   return (
     <div className="space-y-5">
@@ -63,45 +100,70 @@ export function OperationsView() {
       </div>
 
       {/* Sub-tabs & Search */}
-      <div className="flagship-card p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-pressed={subTab === 'BOOKINGS'}
-            onClick={() => setSubTab('BOOKINGS')}
-            className="chip"
-          >
-            <ClipboardIcon size={14} />
-            <span>Tất cả Đơn đặt ({bookings.length})</span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={subTab === 'TOURS'}
-            onClick={() => setSubTab('TOURS')}
-            className="chip"
-          >
-            <CompassIcon size={14} />
-            <span>Tất cả Tour mẫu ({tours.length})</span>
-          </button>
+      <div className="flagship-card p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={subTab === 'BOOKINGS'}
+              onClick={() => setSubTab('BOOKINGS')}
+              className="chip"
+            >
+              <ClipboardIcon size={14} />
+              <span>Tất cả Đơn đặt ({bookings.length})</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={subTab === 'TOURS'}
+              onClick={() => setSubTab('TOURS')}
+              className="chip"
+            >
+              <CompassIcon size={14} />
+              <span>Tất cả Tour mẫu ({tours.length})</span>
+            </button>
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <SearchIcon
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={
+                subTab === 'BOOKINGS'
+                  ? 'Tìm mã đơn, khách, guide, tour'
+                  : 'Tìm tên tour, vùng, guide'
+              }
+              className="field pl-9"
+            />
+          </div>
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <SearchIcon
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={
-              subTab === 'BOOKINGS'
-                ? 'Tìm mã đơn, khách, guide, tour'
-                : 'Tìm tên tour, vùng, guide'
-            }
-            className="field pl-9"
-          />
-        </div>
+        {subTab === 'BOOKINGS' && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-rule">
+            {BOOKING_STATUS_FILTERS.map((f) => {
+              const count =
+                f.value === 'ALL'
+                  ? bookings.length
+                  : bookings.filter((b) => b.status === f.value).length;
+              return (
+                <button
+                  key={f.value}
+                  type="button"
+                  aria-pressed={bookingStatusFilter === f.value}
+                  onClick={() => setBookingStatusFilter(f.value)}
+                  className="chip text-xs py-1 px-2.5"
+                >
+                  <span>{f.label}</span>
+                  <span className="num opacity-75">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -159,7 +221,7 @@ export function OperationsView() {
                         </div>
                       </td>
                       <td className="py-3 px-3.5 num text-xs text-ink-2 whitespace-nowrap">
-                        {formatDateTime(b.startDate)}
+                        {formatDate(b.startDate)}
                       </td>
                       <td className="py-3 px-3.5">
                         <span className={`tag ${st.tagClass}`}>{b.statusLabel || st.label}</span>
@@ -186,6 +248,7 @@ export function OperationsView() {
                   <th className="py-3 px-3.5 font-medium">Vùng / Tỉnh</th>
                   <th className="py-3 px-3.5 font-medium">Guide</th>
                   <th className="py-3 px-3.5 font-medium">Thời lượng</th>
+                  <th className="py-3 px-3.5 font-medium">Trạng thái</th>
                   <th className="py-3 px-3.5 font-medium text-right">Giá gốc</th>
                   <th className="py-3 px-3.5 font-medium text-right">Thao tác</th>
                 </tr>
@@ -193,6 +256,8 @@ export function OperationsView() {
               <tbody className="divide-y divide-rule text-sm">
                 {filteredTours.map((t) => {
                   const isConfirming = confirmDeleteTourId === t.id;
+                  const isActive = t.active !== false;
+                  const isToggling = togglingTourId === t.id;
                   return (
                     <tr key={t.id} className="hover:bg-surface-2/60 transition">
                       <td className="py-3 px-3.5">
@@ -220,6 +285,11 @@ export function OperationsView() {
                         <div className="text-ink whitespace-nowrap">{t.guide?.fullName || '—'}</div>
                       </td>
                       <td className="py-3 px-3.5 num text-ink-2 whitespace-nowrap">{t.days} ngày</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap">
+                        <span className={`tag ${isActive ? 'tag-forest' : 'tag-ochre'}`}>
+                          {isActive ? 'Đang mở' : 'Tạm ẩn'}
+                        </span>
+                      </td>
                       <td className="py-3 px-3.5 num font-medium text-ink text-right whitespace-nowrap">
                         {formatVnd(t.basePricePerPerson)}
                       </td>
@@ -244,15 +314,25 @@ export function OperationsView() {
                             </button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteTourId(t.id)}
-                            className="btn btn-danger py-1.5 px-2.5 text-xs"
-                            title="Xoá tour mẫu chưa có đơn"
-                          >
-                            <TrashIcon size={14} />
-                            <span>Xoá</span>
-                          </button>
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={isToggling}
+                              onClick={() => void handleToggleTourStatus(t.id, !isActive)}
+                              className="btn btn-ghost py-1.5 px-2.5 text-xs"
+                            >
+                              {isToggling ? 'Đang lưu...' : isActive ? 'Tạm ẩn' : 'Mở bán'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteTourId(t.id)}
+                              className="btn btn-danger py-1.5 px-2.5 text-xs"
+                              title="Xoá tour mẫu chưa có đơn"
+                            >
+                              <TrashIcon size={14} />
+                              <span>Xoá</span>
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -270,6 +350,9 @@ export function OperationsView() {
           role="dialog"
           aria-modal="true"
           aria-label={`Chi tiết đơn ${selectedBooking.code}`}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeBookingDetail();
+          }}
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
         >
           <div className="flagship-card w-full max-w-2xl bg-surface max-h-[88vh] flex flex-col overflow-hidden">
@@ -307,7 +390,9 @@ export function OperationsView() {
                 </div>
                 <div className="p-3 rounded-lg border border-rule bg-surface-2">
                   <div className="text-xs text-ink-3">Khởi hành</div>
-                  <div className="num font-medium text-ink mt-0.5">{selectedBooking.startDate}</div>
+                  <div className="num font-medium text-ink mt-0.5">
+                    {formatDate(selectedBooking.startDate)}
+                  </div>
                 </div>
                 <div className="p-3 rounded-lg border border-rule bg-surface-2">
                   <div className="text-xs text-ink-3">Tổng tiền</div>
@@ -317,7 +402,9 @@ export function OperationsView() {
                 </div>
               </div>
 
-              {(selectedBooking.customerNote || selectedBooking.guideNote) && (
+              {(selectedBooking.customerNote ||
+                selectedBooking.guideNote ||
+                selectedBooking.cancelReason) && (
                 <div className="space-y-2 text-sm">
                   {selectedBooking.customerNote && (
                     <div className="p-3 rounded-lg border border-rule bg-surface-2">
@@ -331,8 +418,53 @@ export function OperationsView() {
                       <span className="text-ink-2">{selectedBooking.guideNote}</span>
                     </div>
                   )}
+                  {selectedBooking.cancelReason && (
+                    <div className="p-3 rounded-lg border border-crimson/25 bg-crimson-soft">
+                      <span className="font-medium text-crimson">Lý do huỷ: </span>
+                      <span className="text-ink">{selectedBooking.cancelReason}</span>
+                    </div>
+                  )}
                 </div>
               )}
+
+              {selectedBooking.status !== 'CANCELLED' &&
+                selectedBooking.status !== 'COMPLETED' && (
+                  <div className="p-3.5 rounded-lg border border-rule bg-surface-2 space-y-2">
+                    <div className="text-xs font-medium text-ink-2">Điều chuyển Guide (chỉ cùng vùng)</div>
+                    {guideOptionsForSelectedBooking.length === 0 ? (
+                      <p className="text-xs text-ink-3">
+                        Chưa có Tour Guide khác cùng vùng để điều chuyển đơn này.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={reassignGuideId}
+                          onChange={(e) => setReassignGuideId(e.target.value)}
+                          className="field flex-1 min-w-[200px] text-sm"
+                          aria-label="Chọn Tour Guide mới"
+                        >
+                          <option value="">
+                            -- Chọn Guide thay thế ({selectedBooking.guide?.fullName || 'Chưa có'}) --
+                          </option>
+                          {guideOptionsForSelectedBooking.map(({ guide }) => (
+                            <option key={guide.id} value={guide.id}>
+                              {guide.fullName}
+                              {guide.regionName ? ` · ${guide.regionName}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={!reassignGuideId || reassigningGuide}
+                          onClick={() => void handleReassignGuide()}
+                          className="btn btn-primary text-xs py-2 px-3"
+                        >
+                          {reassigningGuide ? 'Đang chuyển...' : 'Điều chuyển'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
               {selectedBooking.steps && selectedBooking.steps.length > 0 && (
                 <div className="space-y-2">
@@ -358,40 +490,67 @@ export function OperationsView() {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-rule bg-surface-2 flex items-center justify-between gap-3">
-              {selectedBooking.status !== 'CANCELLED' ? (
-                confirmCancelBooking ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-crimson">Xác nhận huỷ đơn {selectedBooking.code}?</span>
-                    <button
-                      type="button"
-                      disabled={cancellingBooking}
-                      onClick={() => void handleCancelSelectedBooking()}
-                      className="btn btn-danger py-1.5 px-3 text-xs !bg-crimson !text-white !border-crimson"
-                    >
-                      {cancellingBooking ? 'Đang huỷ...' : 'Đúng, huỷ đơn'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={cancellingBooking}
-                      onClick={() => setConfirmCancelBooking(false)}
-                      className="btn btn-ghost py-1.5 px-3 text-xs"
-                    >
-                      Giữ lại
-                    </button>
-                  </div>
-                ) : (
+            <div className="px-6 py-4 border-t border-rule bg-surface-2 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedBooking.status === 'CONFIRMED' && (
                   <button
                     type="button"
-                    onClick={() => setConfirmCancelBooking(true)}
-                    className="btn btn-danger text-xs"
+                    disabled={completingBooking}
+                    onClick={() => void handleCompleteSelectedBooking()}
+                    className="btn btn-primary text-xs"
                   >
-                    Huỷ đơn đặt tour
+                    {completingBooking ? 'Đang cập nhật...' : 'Đánh dấu hoàn thành'}
                   </button>
-                )
-              ) : (
-                <span className="text-xs text-ink-3">Đơn này đã ở trạng thái huỷ.</span>
-              )}
+                )}
+
+                {selectedBooking.status !== 'CANCELLED' &&
+                selectedBooking.status !== 'COMPLETED' ? (
+                  confirmCancelBooking ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Lý do huỷ (tuỳ chọn)"
+                        className="field py-1.5 px-2.5 text-xs w-48"
+                      />
+                      <button
+                        type="button"
+                        disabled={cancellingBooking}
+                        onClick={() => void handleCancelSelectedBooking()}
+                        className="btn btn-danger py-1.5 px-3 text-xs !bg-crimson !text-white !border-crimson"
+                      >
+                        {cancellingBooking ? 'Đang huỷ...' : 'Đúng, huỷ đơn'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={cancellingBooking}
+                        onClick={() => {
+                          setConfirmCancelBooking(false);
+                          setCancelReason('');
+                        }}
+                        className="btn btn-ghost py-1.5 px-3 text-xs"
+                      >
+                        Giữ lại
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmCancelBooking(true)}
+                      className="btn btn-danger text-xs"
+                    >
+                      Huỷ đơn đặt tour
+                    </button>
+                  )
+                ) : (
+                  <span className="text-xs text-ink-3">
+                    {selectedBooking.status === 'COMPLETED'
+                      ? 'Đơn này đã hoàn thành.'
+                      : 'Đơn này đã ở trạng thái huỷ.'}
+                  </span>
+                )}
+              </div>
 
               <button type="button" onClick={closeBookingDetail} className="btn btn-ghost text-sm">
                 Đóng

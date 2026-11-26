@@ -6,6 +6,7 @@ export { ActivityIcon } from './ActivityIcon';
 export { AlertIcon } from './AlertIcon';
 export { ArrowLeftIcon } from './ArrowLeftIcon';
 export { ArrowRightIcon } from './ArrowRightIcon';
+export { BellIcon } from './BellIcon';
 export { CalendarIcon } from './CalendarIcon';
 export { CameraIcon } from './CameraIcon';
 export { CheckIcon } from './CheckIcon';

@@ -1,6 +1,7 @@
 package com.tripbuilder.controller.tour;
 
 import com.tripbuilder.dto.request.tour.SaveTourRequest;
+import com.tripbuilder.dto.request.tour.TourStatusRequest;
 import com.tripbuilder.dto.response.ApiResponse;
 import com.tripbuilder.dto.response.tour.TourDto;
 import com.tripbuilder.entity.user.AppUser;
@@ -28,8 +29,11 @@ public class TourController {
             @RequestParam(required = false) Integer minDays,
             @RequestParam(required = false) Integer maxDays,
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) String sort) {
-        return ApiResponse.ok(tourService.list(guideId, regionId, minDays, maxDays, q, sort));
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false, defaultValue = "false") boolean includeInactive,
+            HttpServletRequest request) {
+        AppUser currentUser = AuthInterceptor.getOptionalCurrentUser(request);
+        return ApiResponse.ok(tourService.list(guideId, regionId, minDays, maxDays, q, sort, includeInactive, currentUser));
     }
 
     @GetMapping("/{id}")
@@ -67,6 +71,18 @@ public class TourController {
             throw new ForbiddenException("Chỉ tài khoản Tour Guide mới được sửa tour mẫu");
         }
         return ApiResponse.ok("Đã cập nhật tour mẫu (phiên bản mới)", tourService.update(id, req, user));
+    }
+
+    /** Tour Guide sở hữu hoặc Admin được tạm ẩn / mở bán lại tour mẫu. */
+    @PatchMapping("/{id}/status")
+    public ApiResponse<TourDto> updateStatus(@PathVariable Long id,
+                                             @RequestBody TourStatusRequest req,
+                                             HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.GUIDE && user.getRole() != Role.ADMIN) {
+            throw new ForbiddenException("Bạn không có quyền thay đổi trạng thái tour mẫu");
+        }
+        return ApiResponse.ok("Đã cập nhật trạng thái tour", tourService.updateStatus(id, req, user));
     }
 
     /** Tour Guide sở hữu hoặc Admin được xoá tour mẫu chưa có đơn đặt. */

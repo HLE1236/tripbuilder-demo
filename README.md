@@ -24,11 +24,20 @@ Project1_demo/
 └── run-all.bat                    # Script khởi chạy đồng bộ 4 service trên Windows
 ```
 
-## Tài khoản demo (Mật khẩu chung: `123456`)
+## Dữ liệu mẫu & Tài khoản demo (Mật khẩu chung: `123456`)
 
-- **Khách hàng (`:5173`)**: `an.nguyen@gmail.com`, `hoa.do@gmail.com`, `khoa.hoang@gmail.com` *(hoặc tự đăng ký tài khoản mới trực tiếp trên màn Login)*
-- **Tour Guide (`:5174`)**: `binh.guide@tripbuilder.vn`, `chi.guide@tripbuilder.vn`, `dung.guide@tripbuilder.vn`
+- **Dữ liệu seed sẵn:** 12 vùng điểm đến (Hạ Long, Đà Lạt, Hội An, Sa Pa, Phú Quốc, Huế, Ninh Bình, Hà Giang, Mộc Châu, Nha Trang, Quy Nhơn, Côn Đảo), 24 Tour Guide (đúng 2 Guide/vùng, mỗi Guide chỉ tạo tour tại vùng của mình), 48 Tour mẫu, 12 Khách hàng, 34 đơn đặt tour đủ mọi trạng thái.
+- **Khách hàng (`:5173`)**: `an.nguyen@gmail.com`, `hoa.do@gmail.com`, `khoa.hoang@gmail.com` *(cùng 9 tài khoản khách bổ sung hoặc tự đăng ký mới trực tiếp trên màn Login)*
+- **Tour Guide (`:5174`)**: 6 tài khoản chọn nhanh `binh.guide@tripbuilder.vn`, `chi.guide@tripbuilder.vn`, `dung.guide@tripbuilder.vn`, `minh.guide@tripbuilder.vn`, `nam.guide@tripbuilder.vn`, `thao.guide@tripbuilder.vn` *(cùng 18 Guide khác theo 12 vùng)*
 - **Admin Tổng (`:5175`)**: `admin@tripbuilder.vn`, `operator@tripbuilder.vn`
+
+## Reset DB demo (H2 local)
+
+Dừng Backend (`:8080`), sau đó xoá thư mục `TripBuilder-backend/data` và chạy lại Backend với profile `h2` để seed lại từ đầu:
+
+```powershell
+Remove-Item -Recurse -Force d:\2026.1\Project1_demo\TripBuilder-backend\data
+```
 
 ## Khởi chạy nhanh (Windows)
 

@@ -4,20 +4,26 @@ import {
   deleteTourApi,
   getTourByIdApi,
   getToursApi,
+  toggleTourStatusApi,
   updateTourApi,
 } from '@/api/tour';
 import type { SaveTourPayload, Tour } from '@/api/types';
 
 export const tourKeys = {
   all: ['tours'] as const,
-  list: (guideId?: number) => [...tourKeys.all, 'list', guideId ?? 'all'] as const,
+  list: (guideId?: number, includeInactive = true) =>
+    [...tourKeys.all, 'list', guideId ?? 'all', includeInactive] as const,
   detail: (tourId: number) => [...tourKeys.all, 'detail', tourId] as const,
 };
 
-export function useToursQuery(guideId?: number, enabled = true) {
+export function useToursQuery(
+  guideId?: number,
+  enabled = true,
+  includeInactive = true
+) {
   return useQuery({
-    queryKey: tourKeys.list(guideId),
-    queryFn: () => getToursApi(guideId),
+    queryKey: tourKeys.list(guideId, includeInactive),
+    queryFn: () => getToursApi(guideId, includeInactive),
     enabled,
   });
 }
@@ -66,6 +72,21 @@ export function useDeleteTourMutation(guideId?: number) {
       queryClient.setQueryData<Tour[]>(tourKeys.list(guideId), (prev) =>
         prev ? prev.filter((t) => t.id !== tourId) : []
       );
+      void queryClient.invalidateQueries({ queryKey: tourKeys.all });
+    },
+  });
+}
+
+export function useToggleTourStatusMutation(guideId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tourId, active }: { tourId: number; active: boolean }) =>
+      toggleTourStatusApi(tourId, active),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Tour[]>(tourKeys.list(guideId), (prev) =>
+        prev ? prev.map((t) => (t.id === updated.id ? updated : t)) : [updated]
+      );
+      queryClient.setQueryData(tourKeys.detail(updated.id), updated);
       void queryClient.invalidateQueries({ queryKey: tourKeys.all });
     },
   });

@@ -1,13 +1,16 @@
 import { useState, type FormEvent } from 'react';
-import type { DemoAccount, User } from '../api';
-import { useDemoAccountsQuery, useLoginMutation } from './api/useAuthQueries';
+import type { AuthResponse } from '../api';
+import { useLoginMutation } from './api/useAuthQueries';
 
-export function useLoginForm(onSuccess: (token: string, user: User) => void) {
+export function useLoginForm(
+  onSuccess: (auth: AuthResponse, rememberMe: boolean) => void
+) {
   const [email, setEmail] = useState('admin@tripbuilder.vn');
   const [password, setPassword] = useState('123456');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const demoAccountsQuery = useDemoAccountsQuery('ADMIN');
   const loginMutation = useLoginMutation();
 
   async function submitLogin(loginEmail: string, loginPassword: string) {
@@ -17,12 +20,13 @@ export function useLoginForm(onSuccess: (token: string, user: User) => void) {
         email: loginEmail.trim(),
         password: loginPassword,
         expectedRole: 'ADMIN',
+        rememberMe,
       });
       if (res.user.role !== 'ADMIN') {
         setError('Tài khoản này không có quyền Quản trị hệ thống.');
         return;
       }
-      onSuccess(res.token, res.user);
+      onSuccess(res, rememberMe);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
     }
@@ -37,22 +41,17 @@ export function useLoginForm(onSuccess: (token: string, user: User) => void) {
     void submitLogin(email, password);
   }
 
-  function handleQuickLogin(acc: DemoAccount) {
-    setEmail(acc.email);
-    setPassword('123456');
-    void submitLogin(acc.email, '123456');
-  }
-
   return {
-    accounts: demoAccountsQuery.data ?? [],
-    loadingAccounts: demoAccountsQuery.isLoading,
     email,
     setEmail,
     password,
     setPassword,
+    rememberMe,
+    setRememberMe,
+    showPassword,
+    setShowPassword,
     submitting: loginMutation.isPending,
     error,
     handleFormSubmit,
-    handleQuickLogin,
   };
 }

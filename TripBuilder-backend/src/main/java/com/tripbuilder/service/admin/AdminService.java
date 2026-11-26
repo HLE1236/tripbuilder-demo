@@ -2,6 +2,7 @@ package com.tripbuilder.service.admin;
 
 import com.tripbuilder.dto.request.admin.CreatePresetOptionRequest;
 import com.tripbuilder.dto.request.admin.CreateUserRequest;
+import com.tripbuilder.dto.request.admin.ReassignGuideRequest;
 import com.tripbuilder.dto.request.admin.UpdateUserRequest;
 import com.tripbuilder.dto.response.admin.AdminOverviewDto;
 import com.tripbuilder.dto.response.admin.AdminPresetOptionDto;
@@ -11,11 +12,13 @@ import com.tripbuilder.dto.response.user.UserDto;
 import com.tripbuilder.entity.booking.Booking;
 import com.tripbuilder.entity.booking.BookingStatus;
 import com.tripbuilder.entity.catalog.PresetOption;
+import com.tripbuilder.entity.guide.GuideApplicationStatus;
 import com.tripbuilder.entity.region.Region;
 import com.tripbuilder.entity.user.AppUser;
 import com.tripbuilder.entity.user.Role;
 import com.tripbuilder.exception.BadRequestException;
 import com.tripbuilder.repository.BookingRepository;
+import com.tripbuilder.repository.GuideApplicationRepository;
 import com.tripbuilder.repository.PresetOptionRepository;
 import com.tripbuilder.repository.RegionRepository;
 import com.tripbuilder.repository.SavedTourRepository;
@@ -31,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +46,7 @@ public class AdminService {
     private final RegionRepository regionRepository;
     private final PresetOptionRepository presetOptionRepository;
     private final SavedTourRepository savedTourRepository;
+    private final GuideApplicationRepository guideApplicationRepository;
     private final TourService tourService;
     private final BookingService bookingService;
 
@@ -49,8 +54,13 @@ public class AdminService {
     public AdminOverviewDto getOverview() {
         List<Booking> bookings = bookingRepository.findAll();
         long totalRevenue = bookings.stream()
-                .filter(b -> b.getStatus() == BookingStatus.CONFIRMED)
+                .filter(b -> b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.COMPLETED)
                 .mapToLong(b -> b.getConfirmedTotalPrice() != null ? b.getConfirmedTotalPrice() : b.getTotalPrice())
+                .sum();
+        long collectedDeposit = bookings.stream()
+                .filter(b -> b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.COMPLETED)
+                .filter(b -> Boolean.TRUE.equals(b.getDepositPaid()) && b.getDepositAmount() != null)
+                .mapToLong(Booking::getDepositAmount)
                 .sum();
         long waitingRequote = bookings.stream()
                 .filter(b -> b.getStatus() == BookingStatus.WAITING_REQUOTE
@@ -62,6 +72,9 @@ public class AdminService {
         long confirmed = bookings.stream()
                 .filter(b -> b.getStatus() == BookingStatus.CONFIRMED)
                 .count();
+        long completed = bookings.stream()
+                .filter(b -> b.getStatus() == BookingStatus.COMPLETED)
+                .count();
         long cancelled = bookings.stream()
                 .filter(b -> b.getStatus() == BookingStatus.CANCELLED)
                 .count();
@@ -71,16 +84,19 @@ public class AdminService {
 
         return new AdminOverviewDto(
                 totalRevenue,
+                collectedDeposit,
                 bookings.size(),
                 waitingRequote,
                 requoted,
                 confirmed,
+                completed,
                 cancelled,
                 tourRepository.count(),
                 totalCustomers,
                 totalGuides,
                 regionRepository.count(),
-                presetOptionRepository.count()
+                presetOptionRepository.count(),
+                guideApplicationRepository.countByStatus(GuideApplicationStatus.PENDING)
         );
     }
 
@@ -116,7 +132,10 @@ public class AdminService {
         }
 
         Region region = null;
-        if (req.role() == Role.GUIDE && req.regionId() != null) {
+        if (req.role() == Role.GUIDE) {
+            if (req.regionId() == null) {
+                throw new BadRequestException("Tài khoản Tour Guide bắt buộc chọn vùng phụ trách");
+            }
             region = regionRepository.findById(req.regionId())
                     .orElseThrow(() -> new BadRequestException("Không tìm thấy khu vực ID " + req.regionId()));
         }
@@ -164,7 +183,13 @@ public class AdminService {
             if (req.regionId() != null) {
                 Region region = regionRepository.findById(req.regionId())
                         .orElseThrow(() -> new BadRequestException("Không tìm thấy khu vực ID " + req.regionId()));
+                Long currentRegionId = user.getRegion() != null ? user.getRegion().getId() : null;
+                if (!Objects.equals(currentRegionId, region.getId()) && tourRepository.existsByGuideId(user.getId())) {
+                    throw new BadRequestException("Không thể đổi vùng của Guide đã có tour. Hãy ẩn/xoá tour hoặc tạo tài khoản Guide mới.");
+                }
                 user.setRegion(region);
+            } else if (user.getRegion() == null) {
+                throw new BadRequestException("Tài khoản Tour Guide bắt buộc phải có vùng phụ trách");
             }
             if (req.bio() != null) {
                 String bio = req.bio().trim();
@@ -203,8 +228,21 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<TourDto> listTours(AppUser actingAdmin) {
+        return tourService.list(null, null, null, null, null, null, true, actingAdmin);
+    }
+
+    @Transactional(readOnly = true)
     public List<BookingDto> listBookings() {
         return bookingService.list(null, null);
+    }
+
+    @Transactional
+    public BookingDto reassignGuide(Long bookingId, ReassignGuideRequest req, AppUser actingAdmin) {
+        if (req == null || req.guideId() == null) {
+            throw new BadRequestException("Vui lòng chọn Tour Guide mới");
+        }
+        return bookingService.reassignGuide(bookingId, req.guideId(), actingAdmin);
     }
 
     @Transactional(readOnly = true)

@@ -1,7 +1,7 @@
 import { AlertIcon, ArrowRightIcon, RefreshIcon } from '../../components/icon';
 import { bookingStatusMeta } from '../../config/constants/meta';
 import { useAdminBookingsQuery, useAdminOverviewQuery } from '../../hooks';
-import { useAdminUiStore } from '../../stores';
+import { useAdminUiStore, type BookingStatusFilter } from '../../stores';
 import { formatVnd } from '../../utils/format';
 
 export function OverviewView() {
@@ -9,7 +9,9 @@ export function OverviewView() {
   const { data: bookings = [] } = useAdminBookingsQuery();
   const setActiveTab = useAdminUiStore((s) => s.setActiveTab);
   const setOperationsSubTab = useAdminUiStore((s) => s.setOperationsSubTab);
+  const setBookingStatusFilter = useAdminUiStore((s) => s.setBookingStatusFilter);
   const setRoleFilter = useAdminUiStore((s) => s.setRoleFilter);
+  const setUsersSubTab = useAdminUiStore((s) => s.setUsersSubTab);
 
   const errorMessage = error instanceof Error ? error.message : null;
 
@@ -40,7 +42,8 @@ export function OverviewView() {
     return null;
   }
 
-  const goToBookings = () => {
+  const goToBookings = (status: BookingStatusFilter = 'ALL') => {
+    setBookingStatusFilter(status);
     setOperationsSubTab('BOOKINGS');
     setActiveTab('operations');
   };
@@ -52,6 +55,12 @@ export function OverviewView() {
 
   const goToUsers = (role: 'CUSTOMER' | 'GUIDE') => {
     setRoleFilter(role);
+    setUsersSubTab('USERS');
+    setActiveTab('users');
+  };
+
+  const goToGuideApplications = () => {
+    setUsersSubTab('APPLICATIONS');
     setActiveTab('users');
   };
 
@@ -91,11 +100,11 @@ export function OverviewView() {
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         <button
           type="button"
-          onClick={goToBookings}
+          onClick={() => goToBookings('ALL')}
           className="lg:col-span-5 flagship-card flagship-card-interactive p-5 text-left flex flex-col justify-between gap-4 cursor-pointer"
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-ink-2">Doanh thu đã chốt</span>
+            <span className="text-xs font-medium text-ink-2">GMV đã chốt</span>
             <span className="inline-flex items-center gap-1 text-xs font-medium text-coral">
               <span>Xem đơn</span>
               <ArrowRightIcon size={13} />
@@ -105,16 +114,25 @@ export function OverviewView() {
             <div className="num text-3xl font-semibold text-emerald tracking-tight">
               {formatVnd(overview.totalRevenue)}
             </div>
-            <div className="text-xs text-ink-3 mt-1.5">
-              Từ {overview.confirmedBookings} đơn đã xác nhận trên tổng {overview.totalBookings} đơn đặt
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2 mt-2">
+              <span>
+                Tiền cọc đã thu:{' '}
+                <strong className="num font-semibold text-ink">
+                  {formatVnd(overview.collectedDeposit ?? 0)}
+                </strong>
+              </span>
+              <span className="text-ink-3">·</span>
+              <span className="text-ink-3">
+                {overview.confirmedBookings} đã chốt / {overview.totalBookings} đơn
+              </span>
             </div>
           </div>
         </button>
 
-        <div className="lg:col-span-7 flagship-card grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-rule">
+        <div className="lg:col-span-7 flagship-card grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-rule">
           <button
             type="button"
-            onClick={goToBookings}
+            onClick={() => goToBookings('ALL')}
             className="p-4 text-left hover:bg-surface-2 transition-colors cursor-pointer flex flex-col justify-between gap-2"
           >
             <span className="text-xs font-medium text-ink-2">Tổng đơn đặt</span>
@@ -126,7 +144,7 @@ export function OverviewView() {
 
           <button
             type="button"
-            onClick={goToBookings}
+            onClick={() => goToBookings('WAITING_REQUOTE')}
             className="p-4 text-left hover:bg-surface-2 transition-colors cursor-pointer flex flex-col justify-between gap-2"
           >
             <span className="text-xs font-medium text-ink-2">Chờ báo giá</span>
@@ -138,7 +156,7 @@ export function OverviewView() {
 
           <button
             type="button"
-            onClick={goToBookings}
+            onClick={() => goToBookings('REQUOTED')}
             className="p-4 text-left hover:bg-surface-2 transition-colors cursor-pointer flex flex-col justify-between gap-2"
           >
             <span className="text-xs font-medium text-ink-2">Đã gửi giá</span>
@@ -150,20 +168,32 @@ export function OverviewView() {
 
           <button
             type="button"
-            onClick={goToBookings}
+            onClick={() => goToBookings('CONFIRMED')}
             className="p-4 text-left hover:bg-surface-2 transition-colors cursor-pointer flex flex-col justify-between gap-2"
           >
             <span className="text-xs font-medium text-ink-2">Đã chốt</span>
             <div>
               <div className="num text-2xl font-semibold text-emerald">{overview.confirmedBookings}</div>
-              <div className="text-xs text-ink-3 mt-0.5">Sẵn sàng khởi hành</div>
+              <div className="text-xs text-ink-3 mt-0.5">Sẵn sàng đi</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => goToBookings('COMPLETED')}
+            className="col-span-2 sm:col-span-1 p-4 text-left hover:bg-surface-2 transition-colors cursor-pointer flex flex-col justify-between gap-2"
+          >
+            <span className="text-xs font-medium text-ink-2">Chuyến hoàn thành</span>
+            <div>
+              <div className="num text-2xl font-semibold text-ink">{overview.completedBookings ?? 0}</div>
+              <div className="text-xs text-ink-3 mt-0.5">Đã kết thúc</div>
             </div>
           </button>
         </div>
       </section>
 
       {/* Resource Row */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <button
           type="button"
           onClick={goToTours}
@@ -202,6 +232,20 @@ export function OverviewView() {
 
         <button
           type="button"
+          onClick={goToGuideApplications}
+          className="flagship-card flagship-card-interactive p-4 text-left flex items-center justify-between gap-3 cursor-pointer"
+        >
+          <div>
+            <div className="text-xs font-medium text-ink-2">Hồ sơ HDV chờ duyệt</div>
+            <div className="num text-xl font-semibold text-amber mt-1">
+              {overview.pendingGuideApplications ?? 0}
+            </div>
+          </div>
+          <ArrowRightIcon size={15} className="text-ink-3" />
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('catalog')}
           className="flagship-card flagship-card-interactive p-4 text-left flex items-center justify-between gap-3 cursor-pointer"
         >
@@ -221,7 +265,7 @@ export function OverviewView() {
           <h3 className="text-sm font-semibold text-ink">Đơn đặt tour mới cập nhật</h3>
           <button
             type="button"
-            onClick={goToBookings}
+            onClick={() => goToBookings('ALL')}
             className="text-xs font-medium text-coral hover:underline cursor-pointer"
           >
             Xem tất cả ({overview.totalBookings})
@@ -247,7 +291,7 @@ export function OverviewView() {
                 return (
                   <tr
                     key={b.id}
-                    onClick={goToBookings}
+                    onClick={() => goToBookings('ALL')}
                     className="hover:bg-surface-2/60 transition-colors cursor-pointer"
                   >
                     <td className="py-2.5 px-4 num font-medium text-ink">{b.code}</td>

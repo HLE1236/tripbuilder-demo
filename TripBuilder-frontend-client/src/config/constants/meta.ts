@@ -1,13 +1,5 @@
 import type { BookingStatus, ServiceMode } from '../../api/types';
 
-export const GUIDE_PORT_URL =
-  import.meta.env.VITE_GUIDE_PORT_URL ||
-  import.meta.env.VITE_ADMIN_PORT_URL ||
-  'http://localhost:5174';
-
-export const ADMIN_PORT_URL =
-  import.meta.env.VITE_SUPER_ADMIN_PORT_URL || 'http://localhost:5175';
-
 export function serviceModeMeta(mode?: string | null): {
   mode: ServiceMode;
   label: string;
@@ -77,6 +69,14 @@ export function statusMeta(status: BookingStatus): {
         stampClass: 'stamp-green',
         short: 'Đã xác nhận · Đã chốt',
         hint: 'Sẵn sàng khởi hành',
+      };
+    case 'COMPLETED':
+      return {
+        tone: 'success',
+        tagClass: 'tag-forest',
+        stampClass: 'stamp-green',
+        short: 'Đã hoàn thành',
+        hint: 'Chuyến đi đã kết thúc tốt đẹp',
       };
     case 'CANCELLED':
       return {

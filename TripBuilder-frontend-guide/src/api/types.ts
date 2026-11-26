@@ -11,6 +11,13 @@ export interface User {
   avatarUrl?: string | null;
 }
 
+export interface AuthResponse {
+  token: string;
+  refreshToken: string;
+  expiresInSeconds: number;
+  user: User;
+}
+
 export interface DemoAccount {
   id: number;
   fullName: string;
@@ -70,6 +77,9 @@ export interface Tour {
   days: number;
   basePricePerPerson: number;
   version: number;
+  active: boolean;
+  averageRating?: number | null;
+  reviewCount?: number;
   regionId: number;
   regionName: string;
   province: string;
@@ -95,9 +105,10 @@ export interface SaveTourPayload {
 export type BookingStatus =
   | 'BOOKED_ORIGINAL'
   | 'WAITING_REQUOTE'
-  | 'REQUOTED'
   | 'CHANGE_REQUESTED'
+  | 'REQUOTED'
   | 'CONFIRMED'
+  | 'COMPLETED'
   | 'CANCELLED';
 
 export interface BookingStep {
@@ -140,6 +151,14 @@ export interface Booking {
   startDate: string;
   days: number;
   guests: number;
+  adults?: number | null;
+  children?: number | null;
+  guideAccepted?: boolean;
+  depositPercent?: number | null;
+  depositAmount?: number | null;
+  depositPaid?: boolean;
+  cancelReason?: string | null;
+  hasConfirmedSnapshot?: boolean;
   serviceMode?: ServiceMode | string | null;
   customerNote: string | null;
   guideNote: string | null;
@@ -157,4 +176,52 @@ export interface Booking {
   updatedAt: string;
   steps: BookingStep[];
   revisions: BookingRevision[];
+}
+
+export interface NotificationItem {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  relatedBookingId: number | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  unreadCount: number;
+  items: NotificationItem[];
+}
+
+export type GuideApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface CreateGuideApplicationPayload {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+  regionId: number;
+  yearsExperience?: number;
+  licenseNumber?: string;
+  languages?: string;
+  bio: string;
+  acceptedTerms: boolean;
+}
+
+export interface LookupGuideApplicationPayload {
+  email: string;
+  applicationCode: string;
+}
+
+export interface GuideApplicationStatusInfo {
+  applicationCode: string;
+  fullName: string;
+  email: string;
+  regionName: string;
+  province: string;
+  status: GuideApplicationStatus;
+  reviewNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
 }

@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import type { Booking, BookingStep } from '@/api/types';
 import {
+  useAcceptBookingMutation,
   useCancelBookingMutation,
+  useCompleteBookingMutation,
   useOptionsByRegionQuery,
+  useRejectBookingChangeMutation,
   useRequoteBookingMutation,
 } from '@/hooks/api';
 import { serviceModeMeta, statusMeta } from '@/config/constants/meta';
@@ -63,6 +66,7 @@ export function useBookingRequote({ booking, onUpdated }: UseBookingRequoteOptio
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
   const [pendingDayShrink, setPendingDayShrink] = useState<number | null>(null);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [error, setError] = useState('');
 
   const bookingSig = `${booking.id}-${booking.updatedAt}-${booking.revisionCount}-${booking.status}`;
@@ -78,17 +82,29 @@ export function useBookingRequote({ booking, onUpdated }: UseBookingRequoteOptio
     setExpandedKeys({});
     setPendingDayShrink(null);
     setConfirmCancelOpen(false);
+    setCancelReason('');
     setError('');
   }
 
   const { data: options = [] } = useOptionsByRegionQuery(booking.tour.regionId);
   const requoteMutation = useRequoteBookingMutation();
   const cancelMutation = useCancelBookingMutation();
+  const acceptMutation = useAcceptBookingMutation();
+  const rejectChangeMutation = useRejectBookingChangeMutation();
+  const completeMutation = useCompleteBookingMutation();
 
-  const busy = requoteMutation.isPending || cancelMutation.isPending;
+  const busy =
+    requoteMutation.isPending ||
+    cancelMutation.isPending ||
+    acceptMutation.isPending ||
+    rejectChangeMutation.isPending ||
+    completeMutation.isPending;
   const st = statusMeta(booking.status);
   const mode = serviceModeMeta(booking.serviceMode);
   const isCancelled = booking.status === 'CANCELLED';
+  const isCompleted = booking.status === 'COMPLETED';
+  const isConfirmed = booking.status === 'CONFIRMED';
+  const isLocked = isCancelled || isCompleted || isConfirmed;
 
   const groupAdjustmentSigned =
     adjMode === 'none'
@@ -124,7 +140,9 @@ export function useBookingRequote({ booking, onUpdated }: UseBookingRequoteOptio
 
   const activeLeg = isCancelled
     ? 0
-    : booking.status === 'CONFIRMED'
+    : isCompleted
+    ? 4
+    : isConfirmed
     ? 3
     : booking.status === 'REQUOTED' || booking.status === 'CHANGE_REQUESTED'
     ? 2
@@ -336,17 +354,51 @@ export function useBookingRequote({ booking, onUpdated }: UseBookingRequoteOptio
   const handleCancel = async () => {
     setError('');
     try {
-      const updated = await cancelMutation.mutateAsync(booking.id);
+      const updated = await cancelMutation.mutateAsync({
+        bookingId: booking.id,
+        reason: cancelReason,
+      });
       setConfirmCancelOpen(false);
+      setCancelReason('');
       onUpdated(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể hủy đơn');
     }
   };
 
+  const handleAcceptBooking = async () => {
+    setError('');
+    try {
+      const updated = await acceptMutation.mutateAsync(booking.id);
+      onUpdated(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể xác nhận còn lịch');
+    }
+  };
+
+  const handleRejectChange = async () => {
+    setError('');
+    try {
+      const updated = await rejectChangeMutation.mutateAsync(booking.id);
+      onUpdated(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể từ chối thay đổi');
+    }
+  };
+
+  const handleCompleteBooking = async () => {
+    setError('');
+    try {
+      const updated = await completeMutation.mutateAsync(booking.id);
+      onUpdated(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể xác nhận hoàn thành chuyến');
+    }
+  };
+
   const canSubmitRequote =
     !busy &&
-    !isCancelled &&
+    !isLocked &&
     unpricedCustomSteps.length === 0 &&
     activeStepsCount > 0 &&
     rawTotalPreview >= 0;
@@ -369,12 +421,17 @@ export function useBookingRequote({ booking, onUpdated }: UseBookingRequoteOptio
     setPendingDayShrink,
     confirmCancelOpen,
     setConfirmCancelOpen,
+    cancelReason,
+    setCancelReason,
     options,
     busy,
     error,
     st,
     mode,
     isCancelled,
+    isCompleted,
+    isConfirmed,
+    isLocked,
     groupAdjustmentSigned,
     perPerson,
     rawTotalPreview,
@@ -393,5 +450,8 @@ export function useBookingRequote({ booking, onUpdated }: UseBookingRequoteOptio
     applyDayShrink,
     handleSendRequote,
     handleCancel,
+    handleAcceptBooking,
+    handleRejectChange,
+    handleCompleteBooking,
   };
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { setUnauthorizedHandler, type User } from '../api';
+import { logoutApi, setUnauthorizedHandler, type AuthResponse } from '../api';
+import { getRefreshToken } from '../config/storage/auth-storage';
 import { useAdminUiStore, useAuthStore, useThemeStore } from '../stores';
 import { useMeQuery } from './api/useAuthQueries';
 
@@ -36,6 +37,10 @@ export function useAdminPortal() {
   }, [theme]);
 
   const handleLogout = useCallback(() => {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      void logoutApi({ refreshToken }).catch(() => {});
+    }
     clearSession();
     resetUiState();
     queryClient.clear();
@@ -108,8 +113,8 @@ export function useAdminPortal() {
   }, [user, activeTab]);
 
   const handleLoginSuccess = useCallback(
-    (newToken: string, loggedInUser: User) => {
-      setSession(newToken, loggedInUser);
+    (auth: AuthResponse, rememberMe: boolean) => {
+      setSession(auth, rememberMe);
     },
     [setSession]
   );

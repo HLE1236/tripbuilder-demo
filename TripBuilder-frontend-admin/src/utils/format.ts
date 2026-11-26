@@ -15,6 +15,22 @@ export function formatVnd(amount: number | null | undefined): string {
   return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 }
 
+export function formatDate(iso?: string | null): string {
+  if (!iso) return '—';
+  const trimmed = iso.trim();
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (dateOnlyMatch) {
+    return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+  }
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
 export function formatDateTime(iso?: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);

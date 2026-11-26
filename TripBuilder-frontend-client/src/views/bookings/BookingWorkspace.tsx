@@ -1,4 +1,5 @@
 import { Avatar } from '@astryxdesign/core/Avatar';
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
 import { formatVnd, noteTypeMeta, type Booking } from '../../api';
 import {
   AlertIcon,
@@ -14,6 +15,7 @@ import {
   MapPinIcon,
   PhoneIcon,
   RefreshIcon,
+  RestoreIcon,
   StarIcon,
   UsersIcon,
   XIcon,
@@ -44,8 +46,14 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
     error,
     editOpen,
     setEditOpen,
-    confirmCancel,
-    setConfirmCancel,
+    confirmDepositOpen,
+    setConfirmDepositOpen,
+    policyAccepted,
+    setPolicyAccepted,
+    cancelModalOpen,
+    setCancelModalOpen,
+    cancelReason,
+    setCancelReason,
     rating,
     setRating,
     reviewText,
@@ -58,10 +66,15 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
     st,
     mode,
     isCancelled,
+    isCompleted,
     photos,
     activeStepZeroBased,
     canCustomerEdit,
+    waitingGuideAcceptOriginal,
+    showConfirmButton,
     canConfirm,
+    canRejectChange,
+    depositAmount,
     groupedDays,
     serviceDiffPerPerson,
     serviceDiffTotal,
@@ -70,6 +83,7 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
     handleRefresh,
     handleConfirm,
     handleCancel,
+    handleRejectChange,
     acceptAlternative,
     handleReview,
   } = useBookingWorkspace(booking, onUpdated);
@@ -101,11 +115,11 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
             {st.short}
           </span>
           <span className="num text-sm font-medium px-3 py-1.5 rounded-lg border border-rule bg-surface-2 text-ink-2">
-            Mẫu v{booking.tourVersionSnapshot}
+            Lịch trình đã lưu
           </span>
           {booking.latestTourVersion > booking.tourVersionSnapshot && (
             <span className="text-sm font-medium px-3 py-1.5 rounded-lg bg-amber-soft text-amber">
-              Tour gốc đã lên v{booking.latestTourVersion} · Đơn giữ giá cũ
+              Lịch trình mẫu vừa có cập nhật mới · Chuyến của bạn vẫn giữ nguyên mức giá đã đặt
             </span>
           )}
         </div>
@@ -208,15 +222,14 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
             {!isCancelled && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {STEPPER_LEGS.map((leg) => {
-                  const isCompleted =
-                    booking.status === 'CONFIRMED' ? leg.idx <= 3 : leg.idx < activeStepZeroBased;
-                  const isActive =
-                    booking.status !== 'CONFIRMED' && leg.idx === activeStepZeroBased;
+                  const isDoneAll = booking.status === 'CONFIRMED' || booking.status === 'COMPLETED';
+                  const isStepCompleted = isDoneAll ? leg.idx <= 3 : leg.idx < activeStepZeroBased;
+                  const isActive = !isDoneAll && leg.idx === activeStepZeroBased;
                   return (
                     <div
                       key={leg.idx}
                       className={`rounded-lg border px-3.5 py-2.5 flex items-center gap-2 ${
-                        isCompleted
+                        isStepCompleted
                           ? 'border-emerald/40 bg-emerald-soft text-emerald'
                           : isActive
                           ? 'border-coral/50 bg-coral-soft text-coral'
@@ -224,7 +237,7 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
                       }`}
                     >
                       <span className="num text-sm font-semibold shrink-0">
-                        {isCompleted ? <CheckIcon size={16} /> : `0${leg.idx + 1}`}
+                        {isStepCompleted ? <CheckIcon size={16} /> : `0${leg.idx + 1}`}
                       </span>
                       <span className="text-sm font-medium truncate">
                         {leg.label}
@@ -287,50 +300,50 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
                   </button>
                 )}
 
-                {canConfirm && (
+                {canRejectChange && (
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={handleConfirm}
-                    className="btn btn-confirm text-sm font-semibold"
+                    onClick={handleRejectChange}
+                    className="btn btn-ghost text-sm font-medium"
                   >
-                    <CheckIcon size={16} />
-                    <span>{busy ? 'Đang xử lý...' : 'Chốt chuyến'}</span>
+                    <RestoreIcon size={15} />
+                    <span>Huỷ yêu cầu đổi (Giữ lịch đã chốt)</span>
                   </button>
                 )}
 
-                {!isCancelled && booking.status !== 'CONFIRMED' && (
-                  !confirmCancel ? (
+                {showConfirmButton && (
+                  <div className="flex flex-col items-end gap-1">
                     <button
                       type="button"
-                      disabled={busy}
-                      onClick={() => setConfirmCancel(true)}
-                      className="btn btn-danger text-sm font-medium"
+                      disabled={busy || !canConfirm}
+                      onClick={() => {
+                        setPolicyAccepted(false);
+                        setConfirmDepositOpen(true);
+                      }}
+                      className="btn btn-confirm text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <XIcon size={15} />
-                      <span>Huỷ đơn</span>
+                      <CheckIcon size={16} />
+                      <span>{busy ? 'Đang xử lý...' : 'Chốt chuyến'}</span>
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-2 rounded-lg border border-crimson/40 bg-crimson-soft px-3 py-1.5">
-                      <span className="text-sm font-medium text-crimson">Xác nhận huỷ?</span>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={handleCancel}
-                        className="btn btn-danger !py-1.5 !px-3 text-sm !bg-crimson !text-white !border-crimson"
-                      >
-                        Đúng, huỷ đơn
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setConfirmCancel(false)}
-                        className="btn btn-ghost !py-1.5 !px-3 text-sm"
-                      >
-                        Giữ lại
-                      </button>
-                    </div>
-                  )
+                    {waitingGuideAcceptOriginal && (
+                      <span className="text-xs font-medium text-amber">
+                        Đang chờ Hướng dẫn viên xác nhận lịch trống
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {!isCancelled && !isCompleted && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setCancelModalOpen(true)}
+                    className="btn btn-danger text-sm font-medium"
+                  >
+                    <XIcon size={15} />
+                    <span>Huỷ đơn</span>
+                  </button>
                 )}
               </div>
             </div>
@@ -423,7 +436,7 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
               dịch vụ)
             </h2>
             <span className="num text-sm font-medium text-ink-2">
-              Vòng thương lượng #{booking.revisionCount}
+              Lần trao đổi #{booking.revisionCount}
             </span>
           </div>
 
@@ -606,10 +619,10 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
               <div className="bg-surface-2 px-5 py-3 border-b border-rule flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <ClockIcon size={16} className="text-ink-3" />
-                  <span className="text-sm font-semibold text-ink">Nhật ký thương lượng</span>
+                  <span className="text-sm font-semibold text-ink">Lịch sử trao đổi</span>
                 </div>
                 <span className="num text-sm font-medium text-ink-2">
-                  {booking.revisions.length} vòng
+                  {booking.revisions.length} lần
                 </span>
               </div>
 
@@ -636,8 +649,20 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
             </section>
           )}
 
-          {/* Đánh giá sau chốt (nút 44x44px h-11 w-11 có aria-label) */}
+          {/* Đánh giá sau khi hoàn thành chuyến đi */}
           {booking.status === 'CONFIRMED' && (
+            <section className="flagship-card p-5 space-y-2">
+              <div className="flex items-center gap-2 text-ink">
+                <StarIcon size={16} className="text-amber" />
+                <span className="text-sm font-semibold">Đánh giá Tour Guide</span>
+              </div>
+              <p className="text-sm text-ink-2 leading-relaxed">
+                Bạn có thể đánh giá sau khi chuyến đi hoàn thành.
+              </p>
+            </section>
+          )}
+
+          {isCompleted && (
             <section className="flagship-card">
               <div className="bg-surface-2 px-5 py-3 border-b border-rule flex items-center gap-2">
                 <StarIcon size={16} className="text-amber" />
@@ -695,6 +720,146 @@ export function BookingWorkspace({ booking, onBack, onUpdated }: BookingWorkspac
           )}
         </div>
       </div>
+
+      {/* Modal Xác nhận chốt chuyến & Đặt cọc 30% */}
+      <Dialog
+        isOpen={confirmDepositOpen}
+        onOpenChange={(open) => !open && setConfirmDepositOpen(false)}
+        width={540}
+      >
+        <div className="bg-surface flex flex-col">
+          <DialogHeader
+            title="Xác nhận chốt chuyến & Đặt cọc 30%"
+            subtitle={`Mã chuyến đi: ${booking.code} · ${booking.tourTitleSnapshot}`}
+            onOpenChange={(open) => !open && setConfirmDepositOpen(false)}
+          />
+          <div className="p-5 space-y-4">
+            <div className="rounded-xl border border-rule bg-surface-2 p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm text-ink-2">
+                <span>Tổng chi phí chuyến đi</span>
+                <span className="num font-semibold text-ink">{formatVnd(booking.totalPrice)}</span>
+              </div>
+              <div className="flex items-center justify-between text-base font-semibold text-coral border-t border-rule pt-2">
+                <span>Số tiền đặt cọc (30%)</span>
+                <span className="num text-xl">{formatVnd(depositAmount)}</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-indigo/30 bg-indigo-soft p-4 space-y-1.5 text-sm">
+              <div className="font-semibold text-indigo">Hướng dẫn chuyển khoản VietQR / Ngân hàng</div>
+              <div className="text-ink-2">Ngân hàng: <span className="font-medium text-ink">Techcombank</span></div>
+              <div className="text-ink-2">Số tài khoản: <span className="num font-semibold text-ink">1903 8866 9988</span></div>
+              <div className="text-ink-2">Chủ tài khoản: <span className="font-medium text-ink">TRIPBUILDER VIETNAM</span></div>
+              <div className="text-ink-2">
+                Nội dung chuyển khoản:{' '}
+                <span className="num font-semibold text-ink">COC {booking.code}</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-rule bg-surface-2 p-4 space-y-1.5 text-sm text-ink-2">
+              <div className="font-semibold text-ink">Chính sách hoàn huỷ theo mốc thời gian</div>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Huỷ trước ngày khởi hành &gt; 7 ngày: hoàn 100% tiền cọc</li>
+                <li>Huỷ trước ngày khởi hành 3–7 ngày: hoàn 50% tiền cọc</li>
+                <li>Huỷ trước ngày khởi hành &lt; 72 giờ: không hoàn tiền cọc</li>
+              </ul>
+            </div>
+
+            <label className="flex items-start gap-2.5 text-sm text-ink cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={policyAccepted}
+                onChange={(e) => setPolicyAccepted(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-rule accent-coral"
+              />
+              <span>
+                Tôi đã đọc hướng dẫn đặt cọc 30% và đồng ý với chính sách hoàn huỷ theo mốc thời gian ở trên.
+              </span>
+            </label>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-rule">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirmDepositOpen(false)}
+                className="btn btn-ghost text-sm font-medium"
+              >
+                Để sau
+              </button>
+              <button
+                type="button"
+                disabled={busy || !policyAccepted}
+                onClick={handleConfirm}
+                className="btn btn-confirm text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckIcon size={16} />
+                <span>{busy ? 'Đang xác nhận...' : 'Xác nhận chốt chuyến'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Modal Huỷ đơn với lý do */}
+      <Dialog
+        isOpen={cancelModalOpen}
+        onOpenChange={(open) => !open && setCancelModalOpen(false)}
+        width={480}
+      >
+        <div className="bg-surface flex flex-col">
+          <DialogHeader
+            title="Xác nhận huỷ chuyến đi"
+            subtitle={`Mã chuyến đi: ${booking.code}`}
+            onOpenChange={(open) => !open && setCancelModalOpen(false)}
+          />
+          <div className="p-5 space-y-4">
+            {booking.status === 'CONFIRMED' && (
+              <div className="rounded-xl border border-amber/40 bg-amber-soft p-3.5 text-sm text-amber space-y-1">
+                <div className="font-semibold">Lưu ý chính sách hoàn cọc</div>
+                <ul className="list-disc pl-5 space-y-0.5 text-xs sm:text-sm">
+                  <li>Trước ngày khởi hành &gt; 7 ngày: hoàn 100% cọc</li>
+                  <li>Trước 3–7 ngày: hoàn 50% cọc</li>
+                  <li>Dưới 72 giờ: không hoàn cọc</li>
+                </ul>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label htmlFor="cancel-reason-input" className="text-sm font-medium text-ink block">
+                Lý do huỷ chuyến (tuỳ chọn)
+              </label>
+              <textarea
+                id="cancel-reason-input"
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Ví dụ: Thay đổi lịch công tác, đổi ngày khởi hành..."
+                className="field text-sm"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-rule">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setCancelModalOpen(false)}
+                className="btn btn-ghost text-sm font-medium"
+              >
+                Giữ lại chuyến
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleCancel}
+                className="btn btn-danger !bg-crimson !text-white !border-crimson text-sm font-semibold"
+              >
+                <XIcon size={15} />
+                <span>{busy ? 'Đang huỷ...' : 'Xác nhận huỷ đơn'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
 
       {editOpen && (
         <CustomerCustomizeModal

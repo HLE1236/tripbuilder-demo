@@ -50,8 +50,10 @@ export function GuidePresetEditor({
 }: GuidePresetEditorProps) {
   const {
     isEdit,
+    hasGuideRegion,
+    isRegionLocked,
+    lockedRegionName,
     regionId,
-    handleRegionChange,
     title,
     setTitle,
     description,
@@ -115,6 +117,21 @@ export function GuidePresetEditor({
         </div>
 
         <div className="flex-1 min-h-0 p-5 space-y-5 overflow-y-auto bg-canvas">
+          {!hasGuideRegion && (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber bg-amber-soft px-4 py-3 flex items-start gap-3 text-base text-amber"
+            >
+              <AlertIcon size={18} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold">Tài khoản chưa được gán vùng phụ trách</div>
+                <div className="text-sm font-normal">
+                  Mỗi Tour Guide chỉ được phép tạo tour tại đúng 1 vùng bản địa. Vui lòng liên hệ Admin để gán vùng trước khi lưu tour.
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div
               role="alert"
@@ -147,20 +164,17 @@ export function GuidePresetEditor({
 
               <div className="sm:col-span-3 space-y-1.5">
                 <label htmlFor="tour-region" className="block text-sm font-medium text-ink-2">
-                  Điểm đến
+                  Điểm đến (Khoá theo vùng Guide)
                 </label>
-                <select
+                <div
                   id="tour-region"
-                  value={regionId}
-                  onChange={(e) => handleRegionChange(e.target.value)}
-                  className="field text-[15px] font-medium"
+                  className="field bg-surface-2 text-[14px] font-medium text-ink-2 flex items-center"
+                  title="Tài khoản Guide được khóa theo vùng phụ trách"
                 >
-                  {regions.map((r) => (
-                    <option key={r.id} value={String(r.id)}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
+                  {isRegionLocked && lockedRegionName
+                    ? `Vùng: ${lockedRegionName}`
+                    : 'Chưa gán vùng phụ trách'}
+                </div>
               </div>
 
               <div className="sm:col-span-3 space-y-1.5">
@@ -636,7 +650,7 @@ export function GuidePresetEditor({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !hasGuideRegion}
               className="btn btn-primary text-[15px] font-medium py-2.5 px-5"
             >
               <CheckIcon size={16} strokeWidth={1.5} />

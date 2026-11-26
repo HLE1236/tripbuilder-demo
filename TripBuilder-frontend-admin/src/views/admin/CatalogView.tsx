@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { PresetCategory } from '../../api';
 import {
   AlertIcon,
@@ -44,6 +45,17 @@ export function CatalogView() {
     handleAddOption,
     handleDelete,
   } = useCatalogManager();
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeAddModal();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [modalOpen, closeAddModal]);
 
   return (
     <div className="space-y-5">
@@ -200,6 +212,9 @@ export function CatalogView() {
           role="dialog"
           aria-modal="true"
           aria-label={editingOption ? 'Chỉnh sửa dịch vụ trong kho' : 'Thêm dịch vụ vào kho chuẩn'}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeAddModal();
+          }}
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
         >
           <div className="flagship-card w-full max-w-md p-6 space-y-5 bg-surface">

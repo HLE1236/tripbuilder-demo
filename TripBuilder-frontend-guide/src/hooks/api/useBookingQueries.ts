@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  acceptBookingApi,
   cancelBookingApi,
+  completeBookingApi,
   getBookingByIdApi,
   getBookingsApi,
+  rejectBookingChangeApi,
   requoteBookingApi,
   type RequoteBookingPayload,
 } from '@/api/booking';
@@ -52,7 +55,47 @@ export function useRequoteBookingMutation() {
 export function useCancelBookingMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (bookingId: number) => cancelBookingApi(bookingId),
+    mutationFn: ({ bookingId, reason }: { bookingId: number; reason?: string }) =>
+      cancelBookingApi(bookingId, reason),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Booking[]>(bookingKeys.list(), (prev) =>
+        prev ? prev.map((b) => (b.id === updated.id ? updated : b)) : [updated]
+      );
+      queryClient.setQueryData(bookingKeys.detail(updated.id), updated);
+    },
+  });
+}
+
+export function useAcceptBookingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: number) => acceptBookingApi(bookingId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Booking[]>(bookingKeys.list(), (prev) =>
+        prev ? prev.map((b) => (b.id === updated.id ? updated : b)) : [updated]
+      );
+      queryClient.setQueryData(bookingKeys.detail(updated.id), updated);
+    },
+  });
+}
+
+export function useRejectBookingChangeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: number) => rejectBookingChangeApi(bookingId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Booking[]>(bookingKeys.list(), (prev) =>
+        prev ? prev.map((b) => (b.id === updated.id ? updated : b)) : [updated]
+      );
+      queryClient.setQueryData(bookingKeys.detail(updated.id), updated);
+    },
+  });
+}
+
+export function useCompleteBookingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: number) => completeBookingApi(bookingId),
     onSuccess: (updated) => {
       queryClient.setQueryData<Booking[]>(bookingKeys.list(), (prev) =>
         prev ? prev.map((b) => (b.id === updated.id ? updated : b)) : [updated]

@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
-import { formatVnd, noteTypeMeta, type Booking, type Tour } from '../../api';
+import { formatVnd, noteTypeMeta, type Booking, type PresetOption, type Tour } from '../../api';
+import type { CreateBookingPayload } from '../../api/booking';
+import { getOptionsByRegionApi } from '../../api/option/getOptionsByRegion.api';
 import {
   AlertIcon,
   CalendarIcon,
@@ -8,22 +11,33 @@ import {
   MinusIcon,
   PlusIcon,
   RestoreIcon,
+  SearchIcon,
   SwapIcon,
   UsersIcon,
   VoidIcon,
+  XIcon,
 } from '../../components/icon';
 import { SafeImage } from '../../components/ui/SafeImage';
 import { useCustomerCustomize } from '../../hooks/useCustomerCustomize';
+import { matchesVietnameseQuery } from '../../utils/search';
 import { categoryDotClass } from '../../utils/tour';
 
 export interface CustomerCustomizeModalProps {
   isOpen: boolean;
   tour: Tour;
   customerId: number;
+  isAuthenticated?: boolean;
   existingBooking?: Booking | null;
+  externalError?: string;
   onClose: () => void;
   onSuccess: (booking: Booking) => void;
+  onRequireAuth?: (draft: Omit<CreateBookingPayload, 'customerId'>) => void;
 }
+
+type SwapPriceFilter = 'ALL' | 'CHEAPER' | 'EQUAL' | 'HIGHER';
+type SwapSort = 'default' | 'price_asc' | 'price_desc' | 'diff_asc';
+type PresetSort = 'default' | 'price_asc' | 'price_desc';
+type OptionItem = PresetOption & { description?: string | null };
 
 const CATEGORIES = ['Di chuyển', 'Khách sạn', 'Ăn uống', 'Trải nghiệm', 'Yêu cầu thêm'];
 
@@ -31,18 +45,24 @@ export function CustomerCustomizeModal({
   isOpen,
   tour,
   customerId,
+  isAuthenticated = true,
   existingBooking,
+  externalError,
   onClose,
   onSuccess,
+  onRequireAuth,
 }: CustomerCustomizeModalProps) {
   const {
-    todayStr,
+    tomorrowStr,
     isPostConfirm,
     startDate,
     setStartDate,
     days,
     guests,
-    setGuests,
+    adults,
+    setAdults,
+    children,
+    setChildren,
     serviceMode,
     setServiceMode,
     customerNote,
@@ -70,6 +90,7 @@ export function CustomerCustomizeModal({
     groupAdjustment,
     estTotal,
     hasChanges,
+    itineraryWarnings,
     dayList,
     affectedCount,
     swapStepWithOption,
@@ -84,9 +105,74 @@ export function CustomerCustomizeModal({
   } = useCustomerCustomize({
     tour,
     customerId,
+    isAuthenticated,
     existingBooking,
     onSuccess,
+    onRequireAuth,
   });
+
+  const [swapQuery, setSwapQuery] = useState('');
+  const [swapPriceFilter, setSwapPriceFilter] = useState<SwapPriceFilter>('ALL');
+  const [swapSort, setSwapSort] = useState<SwapSort>('default');
+  const [remoteSwapResult, setRemoteSwapResult] = useState<{
+    uid: string;
+    query: string;
+    items: OptionItem[];
+  } | null>(null);
+
+  const [presetQuery, setPresetQuery] = useState('');
+  const [presetSort, setPresetSort] = useState<PresetSort>('default');
+
+  const handleToggleSwap = (uid: string) => {
+    setSwapQuery('');
+    setSwapPriceFilter('ALL');
+    setSwapSort('default');
+    setRemoteSwapResult(null);
+    setExpandedSwapUid(expandedSwapUid === uid ? null : uid);
+  };
+
+  const handleTogglePresetDay = (dayNum: number, isCurrentlyOpen: boolean) => {
+    setOpenCustomDay(null);
+    setPresetCatFilter('ALL');
+    setPresetQuery('');
+    setPresetSort('default');
+    setOpenPresetDay(isCurrentlyOpen ? null : dayNum);
+  };
+
+  const expandedCategory = steps.find((st) => st._uid === expandedSwapUid)?.category ?? null;
+
+  useEffect(() => {
+    if (!expandedSwapUid || !expandedCategory) return;
+    const trimmed = swapQuery.trim();
+    if (!trimmed) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      getOptionsByRegionApi({
+        regionId: tour.regionId,
+        category: expandedCategory,
+        q: trimmed,
+        sort: swapSort === 'price_asc' || swapSort === 'price_desc' ? swapSort : 'default',
+      })
+        .then((fetched) => {
+          if (!cancelled && Array.isArray(fetched)) {
+            setRemoteSwapResult({
+              uid: expandedSwapUid,
+              query: trimmed,
+              items: fetched as OptionItem[],
+            });
+          }
+        })
+        .catch(() => {
+          // Giữ kết quả lọc phía client khi tìm kiếm nền lỗi
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [expandedCategory, expandedSwapUid, swapQuery, swapSort, tour.regionId]);
 
   return (
     <Dialog
@@ -130,10 +216,10 @@ export function CustomerCustomizeModal({
             </div>
           )}
 
-          {error && (
+          {(error || externalError) && (
             <div className="rounded-xl border border-crimson/40 bg-crimson-soft px-4 py-3.5 text-sm font-medium text-crimson flex items-start gap-3">
               <AlertIcon size={18} className="mt-0.5 shrink-0" />
-              <span>{error}</span>
+              <span>{error || externalError}</span>
             </div>
           )}
 
@@ -159,12 +245,13 @@ export function CustomerCustomizeModal({
                   <input
                     id="cust-start-date"
                     type="date"
-                    min={todayStr}
+                    min={tomorrowStr}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                     className="field num !pl-9 !py-2 text-base"
                   />
                 </div>
+                <p className="text-xs text-ink-3">Đặt trước tối thiểu 24 giờ</p>
               </div>
 
               <div className="p-4 space-y-2">
@@ -194,31 +281,67 @@ export function CustomerCustomizeModal({
                 </div>
               </div>
 
-              <div className="p-4 space-y-2">
-                <span className="text-sm font-medium text-ink-3 block">Số khách</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGuests((g) => Math.max(1, g - 1))}
-                    disabled={guests <= 1}
-                    aria-label="Giảm số khách"
-                    className="btn btn-ghost !p-2 h-10 w-10"
-                  >
-                    <MinusIcon size={16} />
-                  </button>
-                  <span className="num text-base font-semibold text-ink flex-1 text-center inline-flex items-center justify-center gap-1.5">
-                    <UsersIcon size={16} className="text-ink-3" />
-                    {guests}
+              <div className="p-4 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-ink-3">Số khách</span>
+                  <span className="num text-xs font-medium text-ink-2 inline-flex items-center gap-1">
+                    <UsersIcon size={13} className="text-ink-3" />
+                    Tổng {guests} khách
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setGuests((g) => Math.min(30, g + 1))}
-                    disabled={guests >= 30}
-                    aria-label="Tăng số khách"
-                    className="btn btn-ghost !p-2 h-10 w-10"
-                  >
-                    <PlusIcon size={16} />
-                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-ink-2">Người lớn</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setAdults((a) => Math.max(1, a - 1))}
+                        disabled={adults <= 1}
+                        aria-label="Giảm số người lớn"
+                        className="btn btn-ghost !p-1.5 h-8 w-8"
+                      >
+                        <MinusIcon size={14} />
+                      </button>
+                      <span className="num text-sm font-semibold text-ink w-6 text-center">
+                        {adults}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAdults((a) => (guests < 30 ? a + 1 : a))}
+                        disabled={guests >= 30}
+                        aria-label="Tăng số người lớn"
+                        className="btn btn-ghost !p-1.5 h-8 w-8"
+                      >
+                        <PlusIcon size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-ink-2">Trẻ em</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setChildren((c) => Math.max(0, c - 1))}
+                        disabled={children <= 0}
+                        aria-label="Giảm số trẻ em"
+                        className="btn btn-ghost !p-1.5 h-8 w-8"
+                      >
+                        <MinusIcon size={14} />
+                      </button>
+                      <span className="num text-sm font-semibold text-ink w-6 text-center">
+                        {children}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setChildren((c) => (guests < 30 ? c + 1 : c))}
+                        disabled={guests >= 30}
+                        aria-label="Tăng số trẻ em"
+                        className="btn btn-ghost !p-1.5 h-8 w-8"
+                      >
+                        <PlusIcon size={14} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -242,9 +365,28 @@ export function CustomerCustomizeModal({
                     Đặt hộ
                   </button>
                 </div>
+                <p className="text-xs text-ink-3 leading-relaxed">
+                  {serviceMode === 'COMPANION'
+                    ? 'Guide đồng hành trực tiếp suốt hành trình.'
+                    : 'Guide đặt dịch vụ từ xa, không đi cùng đoàn.'}
+                </p>
               </div>
             </div>
           </section>
+
+          {itineraryWarnings.length > 0 && (
+            <div className="rounded-xl border border-amber/40 bg-amber-soft px-4 py-3 text-sm text-amber space-y-1">
+              <div className="font-semibold flex items-center gap-2">
+                <AlertIcon size={16} className="shrink-0" />
+                <span>Lưu ý nhỏ về lịch trình (không bắt buộc sửa)</span>
+              </div>
+              <ul className="list-disc pl-6 space-y-0.5 text-xs sm:text-sm">
+                {itineraryWarnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Cảnh báo khi giảm số ngày mà ngày bị cắt có hoạt động */}
           {pendingReduceDays !== null && (
@@ -296,9 +438,19 @@ export function CustomerCustomizeModal({
                 .reduce((acc, s) => acc + (s.pricePerPerson || 0), 0);
               const isPresetOpen = openPresetDay === dayNum;
               const isCustomOpen = openCustomDay === dayNum;
-              const filteredRegionOptions = options.filter(
-                (o) => presetCatFilter === 'ALL' || o.category === presetCatFilter
-              );
+              const filteredRegionOptions = (options as OptionItem[])
+                .filter((o) => presetCatFilter === 'ALL' || o.category === presetCatFilter)
+                .filter(
+                  (o) =>
+                    !presetQuery.trim() ||
+                    matchesVietnameseQuery(o.title, presetQuery) ||
+                    matchesVietnameseQuery(o.description, presetQuery)
+                )
+                .sort((a, b) => {
+                  if (presetSort === 'price_asc') return a.pricePerPerson - b.pricePerPerson;
+                  if (presetSort === 'price_desc') return b.pricePerPerson - a.pricePerPerson;
+                  return 0;
+                });
 
               return (
                 <section key={dayNum} className="flagship-card">
@@ -423,9 +575,7 @@ export function CustomerCustomizeModal({
                                 {canSwap && (
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setExpandedSwapUid(isSwapExpanded ? null : s._uid)
-                                    }
+                                    onClick={() => handleToggleSwap(s._uid)}
                                     aria-expanded={isSwapExpanded}
                                     className={`btn !py-2 !px-3 text-sm font-medium ${
                                       isSwapExpanded ? 'btn-primary' : 'btn-ghost'
@@ -451,156 +601,304 @@ export function CustomerCustomizeModal({
                               </div>
                             </div>
 
-                            {isSwapExpanded && (
-                              <div className="bg-surface-2 border-t border-rule px-5 py-4 space-y-3">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="text-sm font-semibold text-ink">
-                                    Chọn phương án {s.category} thay thế tại {tour.regionName}
-                                  </span>
-                                  <span className="text-sm text-ink-3">
-                                    Chênh lệch tính so với lựa chọn đang hiển thị
-                                  </span>
-                                </div>
+                            {isSwapExpanded && (() => {
+                              const trimmedSwapQuery = swapQuery.trim();
+                              const activeRemoteOptions =
+                                remoteSwapResult &&
+                                remoteSwapResult.uid === s._uid &&
+                                remoteSwapResult.query === trimmedSwapQuery
+                                  ? remoteSwapResult.items
+                                  : [];
 
-                                <div className="divide-y divide-rule rounded-lg border border-rule bg-surface overflow-hidden">
-                                  {s.originalTitle &&
-                                    s.originalTitle !== s.title &&
-                                    !sameCatOptions.some((o) => o.title === s.originalTitle) && (
-                                      <button
-                                        type="button"
-                                        onClick={() => restoreOriginalStep(s._uid)}
-                                        className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-surface-2 text-left cursor-pointer transition-colors duration-150"
-                                      >
-                                        <div className="min-w-0">
-                                          <div className="text-[15px] font-semibold text-ink truncate">
-                                            {s.originalTitle}{' '}
-                                            <span className="text-ink-2">(Mục gốc của tour)</span>
-                                          </div>
-                                        </div>
-                                        <div className="text-right shrink-0 space-y-0.5">
-                                          <div className="num text-[15px] font-semibold text-ink">
-                                            {formatVnd(origPrice)}
-                                          </div>
-                                          <div>
-                                            <span
-                                              className={`num inline-flex items-center rounded-md px-2 py-0.5 text-sm font-medium ${
-                                                origPrice - s.pricePerPerson > 0
-                                                  ? 'bg-amber-soft text-amber'
-                                                  : origPrice - s.pricePerPerson < 0
-                                                  ? 'bg-emerald-soft text-emerald'
-                                                  : 'bg-surface-2 text-ink-3'
-                                              }`}
-                                            >
-                                              {origPrice - s.pricePerPerson === 0
-                                                ? 'Không đổi giá'
-                                                : `${origPrice - s.pricePerPerson > 0 ? '+' : ''}${formatVnd(
-                                                    origPrice - s.pricePerPerson
-                                                  )}/khách`}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </button>
-                                    )}
+                              const mergedSameCatOptions: OptionItem[] = [
+                                ...(sameCatOptions as OptionItem[]),
+                                ...activeRemoteOptions.filter(
+                                  (r) =>
+                                    r.category === s.category &&
+                                    !sameCatOptions.some((o) => o.id === r.id)
+                                ),
+                              ];
 
-                                  {sameCatOptions.map((opt) => {
-                                    const isSelected =
-                                      opt.title === s.title &&
-                                      opt.pricePerPerson === s.pricePerPerson;
-                                    const isOriginal =
-                                      Boolean(s.originalTitle) && opt.title === s.originalTitle;
-                                    const delta = opt.pricePerPerson - s.pricePerPerson;
-
+                              const filteredSwapOptions = mergedSameCatOptions
+                                .filter((opt) => {
+                                  if (
+                                    swapQuery.trim() &&
+                                    !matchesVietnameseQuery(opt.title, swapQuery) &&
+                                    !matchesVietnameseQuery(opt.description, swapQuery)
+                                  ) {
+                                    return false;
+                                  }
+                                  if (swapPriceFilter === 'CHEAPER') {
+                                    return opt.pricePerPerson < s.pricePerPerson;
+                                  }
+                                  if (swapPriceFilter === 'EQUAL') {
+                                    return opt.pricePerPerson === s.pricePerPerson;
+                                  }
+                                  if (swapPriceFilter === 'HIGHER') {
+                                    return opt.pricePerPerson > s.pricePerPerson;
+                                  }
+                                  return true;
+                                })
+                                .sort((a, b) => {
+                                  if (swapSort === 'price_asc') {
+                                    return a.pricePerPerson - b.pricePerPerson;
+                                  }
+                                  if (swapSort === 'price_desc') {
+                                    return b.pricePerPerson - a.pricePerPerson;
+                                  }
+                                  if (swapSort === 'diff_asc') {
                                     return (
-                                      <button
-                                        key={opt.id}
-                                        type="button"
-                                        disabled={isSelected}
-                                        onClick={() => swapStepWithOption(s._uid, opt)}
-                                        className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-left transition-colors duration-150 ${
-                                          isSelected
-                                            ? 'bg-surface-2 cursor-default'
-                                            : 'hover:bg-surface-2 cursor-pointer'
-                                        }`}
+                                      Math.abs(a.pricePerPerson - s.pricePerPerson) -
+                                      Math.abs(b.pricePerPerson - s.pricePerPerson)
+                                    );
+                                  }
+                                  return 0;
+                                });
+
+                              return (
+                                <div className="bg-surface-2 border-t border-rule px-5 py-4 space-y-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="text-sm font-semibold text-ink">
+                                      Chọn phương án {s.category} thay thế tại {tour.regionName}
+                                    </span>
+                                    <span className="text-sm text-ink-3">
+                                      Chênh lệch tính so với lựa chọn đang hiển thị
+                                    </span>
+                                  </div>
+
+                                  {/* Thanh tìm kiếm, lọc giá & sắp xếp */}
+                                  <div className="space-y-2.5">
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                      <div className="relative flex-1 flex items-center">
+                                        <SearchIcon
+                                          size={15}
+                                          className="text-ink-3 absolute left-3 pointer-events-none"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={swapQuery}
+                                          onChange={(e) => setSwapQuery(e.target.value)}
+                                          placeholder="Tìm tên hoặc mô tả (hỗ trợ không dấu)..."
+                                          aria-label="Tìm phương án thay thế"
+                                          className="field !pl-9 !pr-8 !py-2 text-sm w-full"
+                                        />
+                                        {swapQuery && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setSwapQuery('')}
+                                            aria-label="Xoá tìm kiếm"
+                                            className="absolute right-2.5 p-0.5 text-ink-3 hover:text-ink cursor-pointer"
+                                          >
+                                            <XIcon size={14} />
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <select
+                                        value={swapSort}
+                                        onChange={(e) => setSwapSort(e.target.value as SwapSort)}
+                                        aria-label="Sắp xếp phương án thay thế"
+                                        className="field !py-2 text-sm sm:w-48"
                                       >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                          <SafeImage
-                                            src={opt.imageUrl || tour.imageUrl}
-                                            alt={opt.title}
-                                            className="w-14 h-11 rounded-lg object-cover border border-rule shrink-0"
-                                          />
+                                        <option value="default">Mặc định</option>
+                                        <option value="price_asc">Giá thấp → cao</option>
+                                        <option value="price_desc">Giá cao → thấp</option>
+                                        <option value="diff_asc">Chênh lệch ít nhất</option>
+                                      </select>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      {(
+                                        [
+                                          { id: 'ALL', label: 'Tất cả' },
+                                          { id: 'CHEAPER', label: 'Rẻ hơn' },
+                                          { id: 'EQUAL', label: 'Tương đương' },
+                                          { id: 'HIGHER', label: 'Cao cấp hơn' },
+                                        ] as const
+                                      ).map((chipItem) => (
+                                        <button
+                                          key={chipItem.id}
+                                          type="button"
+                                          aria-pressed={swapPriceFilter === chipItem.id}
+                                          onClick={() => setSwapPriceFilter(chipItem.id)}
+                                          className="chip !py-1 !px-3 text-sm font-medium"
+                                        >
+                                          {chipItem.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="divide-y divide-rule rounded-lg border border-rule bg-surface overflow-hidden">
+                                    {s.originalTitle &&
+                                      s.originalTitle !== s.title &&
+                                      !sameCatOptions.some((o) => o.title === s.originalTitle) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => restoreOriginalStep(s._uid)}
+                                          className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-surface-2 text-left cursor-pointer transition-colors duration-150"
+                                        >
                                           <div className="min-w-0">
                                             <div className="text-[15px] font-semibold text-ink truncate">
-                                              {opt.title}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-sm">
-                                              {isOriginal && (
-                                                <span className="text-ink-2 font-medium">
-                                                  Mục gốc của tour
-                                                </span>
-                                              )}
-                                              {isSelected && (
-                                                <span className="text-coral font-medium">
-                                                  Đang chọn
-                                                </span>
-                                              )}
+                                              {s.originalTitle}{' '}
+                                              <span className="text-ink-2">(Mục gốc của tour)</span>
                                             </div>
                                           </div>
-                                        </div>
+                                          <div className="text-right shrink-0 space-y-0.5">
+                                            <div className="num text-[15px] font-semibold text-ink">
+                                              {formatVnd(origPrice)}
+                                            </div>
+                                            <div>
+                                              <span
+                                                className={`num inline-flex items-center rounded-md px-2 py-0.5 text-sm font-medium ${
+                                                  origPrice - s.pricePerPerson > 0
+                                                    ? 'bg-amber-soft text-amber'
+                                                    : origPrice - s.pricePerPerson < 0
+                                                    ? 'bg-emerald-soft text-emerald'
+                                                    : 'bg-surface-2 text-ink-3'
+                                                }`}
+                                              >
+                                                {origPrice - s.pricePerPerson === 0
+                                                  ? 'Không đổi giá'
+                                                  : `${origPrice - s.pricePerPerson > 0 ? '+' : ''}${formatVnd(
+                                                      origPrice - s.pricePerPerson
+                                                    )}/khách`}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </button>
+                                      )}
 
-                                        <div className="text-right shrink-0 space-y-0.5">
-                                          <div className="num text-[15px] font-semibold text-ink">
-                                            {formatVnd(opt.pricePerPerson)}
-                                          </div>
-                                          <div>
-                                            <span
-                                              className={`num inline-flex items-center rounded-md px-2 py-0.5 text-sm font-medium ${
-                                                isSelected
-                                                  ? 'bg-surface-2 text-ink-3'
-                                                  : delta > 0
-                                                  ? 'bg-amber-soft text-amber'
-                                                  : delta < 0
-                                                  ? 'bg-emerald-soft text-emerald'
-                                                  : 'bg-surface-2 text-ink-3'
-                                              }`}
-                                            >
-                                              {isSelected
-                                                ? 'Đang chọn'
-                                                : delta === 0
-                                                ? 'Không đổi giá'
-                                                : `${delta > 0 ? '+' : ''}${formatVnd(
-                                                    delta
-                                                  )}/khách`}
+                                    {filteredSwapOptions.length === 0 ? (
+                                      <div className="px-4 py-6 text-center space-y-3">
+                                        <p className="text-sm text-ink-2">
+                                          Không tìm thấy phương án {s.category} phù hợp với bộ lọc hiện tại.
+                                        </p>
+                                        {trimmedSwapQuery && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              swapStepWithOption(s._uid, {
+                                                id: -Date.now(),
+                                                regionId: tour.regionId,
+                                                category: s.category,
+                                                title: trimmedSwapQuery,
+                                                imageUrl: s.imageUrl,
+                                                pricePerPerson: 0,
+                                              })
+                                            }
+                                            className="btn btn-primary !py-2 !px-4 text-sm font-medium inline-flex items-center gap-2"
+                                          >
+                                            <CustomIcon size={15} />
+                                            <span>
+                                              Đề xuất &ldquo;{trimmedSwapQuery}&rdquo; như yêu cầu riêng để Guide báo giá
                                             </span>
-                                          </div>
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      filteredSwapOptions.map((opt) => {
+                                        const isSelected =
+                                          opt.title === s.title &&
+                                          opt.pricePerPerson === s.pricePerPerson;
+                                        const isOriginal =
+                                          Boolean(s.originalTitle) && opt.title === s.originalTitle;
+                                        const delta = opt.pricePerPerson - s.pricePerPerson;
+
+                                        return (
+                                          <button
+                                            key={opt.id}
+                                            type="button"
+                                            disabled={isSelected}
+                                            onClick={() => swapStepWithOption(s._uid, opt)}
+                                            className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-left transition-colors duration-150 ${
+                                              isSelected
+                                                ? 'bg-surface-2 cursor-default'
+                                                : 'hover:bg-surface-2 cursor-pointer'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                              <SafeImage
+                                                src={opt.imageUrl || tour.imageUrl}
+                                                alt={opt.title}
+                                                className="w-14 h-11 rounded-lg object-cover border border-rule shrink-0"
+                                              />
+                                              <div className="min-w-0">
+                                                <div className="text-[15px] font-semibold text-ink truncate">
+                                                  {opt.title}
+                                                </div>
+                                                {opt.description && (
+                                                  <div className="text-sm text-ink-3 line-clamp-2 mt-0.5">
+                                                    {opt.description}
+                                                  </div>
+                                                )}
+                                                <div className="flex items-center gap-2 text-sm">
+                                                  {isOriginal && (
+                                                    <span className="text-ink-2 font-medium">
+                                                      Mục gốc của tour
+                                                    </span>
+                                                  )}
+                                                  {isSelected && (
+                                                    <span className="text-coral font-medium">
+                                                      Đang chọn
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="text-right shrink-0 space-y-0.5">
+                                              <div className="num text-[15px] font-semibold text-ink">
+                                                {formatVnd(opt.pricePerPerson)}
+                                              </div>
+                                              <div>
+                                                <span
+                                                  className={`num inline-flex items-center rounded-md px-2 py-0.5 text-sm font-medium ${
+                                                    isSelected
+                                                      ? 'bg-surface-2 text-ink-3'
+                                                      : delta > 0
+                                                      ? 'bg-amber-soft text-amber'
+                                                      : delta < 0
+                                                      ? 'bg-emerald-soft text-emerald'
+                                                      : 'bg-surface-2 text-ink-3'
+                                                  }`}
+                                                >
+                                                  {isSelected
+                                                    ? 'Đang chọn'
+                                                    : delta === 0
+                                                    ? 'Không đổi giá'
+                                                    : `${delta > 0 ? '+' : ''}${formatVnd(
+                                                        delta
+                                                      )}/khách`}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </button>
+                                        );
+                                      })
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         );
                       })}
                     </div>
                   )}
 
-                  {/* Thêm từ kho vùng hoặc Tự nhập yêu cầu riêng */}
+                  {/* Thêm từ gợi ý có sẵn hoặc Tự nhập yêu cầu riêng */}
                   <div className="bg-surface-2 border-t border-rule px-5 py-3.5 space-y-3">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <button
                         type="button"
-                        onClick={() => {
-                          setOpenCustomDay(null);
-                          setPresetCatFilter('ALL');
-                          setOpenPresetDay(isPresetOpen ? null : dayNum);
-                        }}
+                        onClick={() => handleTogglePresetDay(dayNum, isPresetOpen)}
                         className={`btn !py-2 !px-3.5 text-sm font-medium ${
                           isPresetOpen ? 'btn-primary' : 'btn-ghost'
                         }`}
                       >
                         <PlusIcon size={15} />
-                        <span>Chọn dịch vụ có sẵn từ kho vùng</span>
+                        <span>Chọn dịch vụ gợi ý có sẵn</span>
                       </button>
 
                       <button
@@ -642,9 +940,69 @@ export function CustomerCustomizeModal({
                           </div>
                         </div>
 
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="relative flex-1 flex items-center">
+                            <SearchIcon
+                              size={15}
+                              className="text-ink-3 absolute left-3 pointer-events-none"
+                            />
+                            <input
+                              type="text"
+                              value={presetQuery}
+                              onChange={(e) => setPresetQuery(e.target.value)}
+                              placeholder="Tìm dịch vụ theo tên hoặc mô tả (hỗ trợ không dấu)..."
+                              aria-label="Tìm dịch vụ gợi ý có sẵn"
+                              className="field !pl-9 !pr-8 !py-2 text-sm w-full"
+                            />
+                            {presetQuery && (
+                              <button
+                                type="button"
+                                onClick={() => setPresetQuery('')}
+                                aria-label="Xoá tìm kiếm dịch vụ"
+                                className="absolute right-2.5 p-0.5 text-ink-3 hover:text-ink cursor-pointer"
+                              >
+                                <XIcon size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          <select
+                            value={presetSort}
+                            onChange={(e) => setPresetSort(e.target.value as PresetSort)}
+                            aria-label="Sắp xếp dịch vụ theo giá"
+                            className="field !py-2 text-sm sm:w-44"
+                          >
+                            <option value="default">Mặc định</option>
+                            <option value="price_asc">Giá thấp → cao</option>
+                            <option value="price_desc">Giá cao → thấp</option>
+                          </select>
+                        </div>
+
                         {filteredRegionOptions.length === 0 ? (
-                          <div className="text-sm text-ink-3 py-2">
-                            Chưa có dịch vụ mẫu thuộc nhóm này tại {tour.regionName}.
+                          <div className="py-4 text-center space-y-2.5">
+                            <div className="text-sm text-ink-3">
+                              {presetQuery.trim()
+                                ? `Không tìm thấy dịch vụ phù hợp với "${presetQuery.trim()}".`
+                                : `Chưa có dịch vụ mẫu thuộc nhóm này tại ${tour.regionName}.`}
+                            </div>
+                            {presetQuery.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const q = presetQuery.trim();
+                                  setOpenPresetDay(null);
+                                  setCustomCat(
+                                    presetCatFilter !== 'ALL' ? presetCatFilter : 'Trải nghiệm'
+                                  );
+                                  setCustomTitle(q);
+                                  setOpenCustomDay(dayNum);
+                                }}
+                                className="btn btn-primary !py-2 !px-3.5 text-sm font-medium inline-flex items-center gap-2"
+                              >
+                                <CustomIcon size={15} />
+                                <span>Đề xuất &ldquo;{presetQuery.trim()}&rdquo; như yêu cầu riêng</span>
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
@@ -665,6 +1023,11 @@ export function CustomerCustomizeModal({
                                     <div className="text-sm font-semibold text-ink truncate">
                                       {opt.title}
                                     </div>
+                                    {opt.description && (
+                                      <div className="text-xs text-ink-3 line-clamp-2 mt-0.5">
+                                        {opt.description}
+                                      </div>
+                                    )}
                                     <div className="text-sm text-ink-3">{opt.category}</div>
                                   </div>
                                 </div>
@@ -766,14 +1129,21 @@ export function CustomerCustomizeModal({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <span className="num text-2xl font-semibold text-ink">{formatVnd(estTotal)}</span>
-              {unpricedCustomCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-soft text-amber px-3 py-1 text-sm font-medium">
-                  <AlertIcon size={15} />
+              {unpricedCustomCount > 0 ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm sm:text-base font-medium text-ink">
                   <span>
-                    Có {unpricedCustomCount} yêu cầu riêng đang chờ Guide báo giá
+                    Tạm tính phần có sẵn:{' '}
+                    <span className="num text-xl sm:text-2xl font-semibold text-ink">
+                      {formatVnd(estTotal)}
+                    </span>
                   </span>
-                </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-soft text-amber px-3 py-1 text-sm font-medium">
+                    <AlertIcon size={15} />
+                    <span>+ {unpricedCustomCount} mục chờ Guide báo giá</span>
+                  </span>
+                </div>
+              ) : (
+                <span className="num text-2xl font-semibold text-ink">{formatVnd(estTotal)}</span>
               )}
             </div>
           </div>

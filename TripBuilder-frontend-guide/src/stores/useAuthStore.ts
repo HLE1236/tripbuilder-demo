@@ -1,13 +1,17 @@
 import { create } from 'zustand';
-import type { User } from '@/api/types';
-import { getAuthToken, setAuthToken } from '@/config/storage/auth-storage';
+import type { AuthResponse, User } from '@/api/types';
+import {
+  clearAuthTokens,
+  getAuthToken,
+  setAuthTokens,
+} from '@/config/storage/auth-storage';
 
 interface AuthState {
   user: User | null;
   authChecking: boolean;
   authError: string;
   setUser: (user: User | null) => void;
-  setSession: (token: string, user: User) => void;
+  setSession: (auth: AuthResponse, rememberMe?: boolean) => void;
   setAuthChecking: (checking: boolean) => void;
   setAuthError: (error: string) => void;
   logout: () => void;
@@ -20,14 +24,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   authChecking: hasInitialToken,
   authError: '',
   setUser: (user) => set({ user }),
-  setSession: (token, user) => {
-    setAuthToken(token);
-    set({ user, authError: '', authChecking: false });
+  setSession: (auth, rememberMe = false) => {
+    setAuthTokens(auth.token, auth.refreshToken, rememberMe);
+    set({ user: auth.user, authError: '', authChecking: false });
   },
   setAuthChecking: (authChecking) => set({ authChecking }),
   setAuthError: (authError) => set({ authError }),
   logout: () => {
-    setAuthToken(null);
+    clearAuthTokens();
     set({ user: null, authChecking: false });
   },
 }));

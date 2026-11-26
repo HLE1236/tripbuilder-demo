@@ -16,7 +16,12 @@ public class PresetOptionController {
     private final PresetOptionService presetOptionService;
 
     @GetMapping
-    public ApiResponse<List<OptionDto>> getByRegion(@RequestParam Long regionId) {
-        return ApiResponse.ok(presetOptionService.getByRegion(regionId));
+    public ApiResponse<List<OptionDto>> getByRegion(
+            @RequestParam Long regionId,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false, defaultValue = "default") String sort
+    ) {
+        return ApiResponse.ok(presetOptionService.getByRegion(regionId, category, q, sort));
     }
 }

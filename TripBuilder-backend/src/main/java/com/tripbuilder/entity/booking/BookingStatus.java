@@ -18,6 +18,7 @@ public enum BookingStatus {
     CHANGE_REQUESTED("Điều chỉnh sau chốt", 2),
     REQUOTED("Đã có báo giá", 3),
     CONFIRMED("Đã chốt", 4),
+    COMPLETED("Đã hoàn thành", 5),
     CANCELLED("Đã huỷ", 0);
 
     private final String label;

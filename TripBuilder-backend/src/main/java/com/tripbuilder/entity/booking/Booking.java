@@ -93,6 +93,27 @@ public class Booking {
     /** Đánh dấu đơn đang ở luồng điều chỉnh sau khi đã chốt. */
     private Boolean postConfirmAdjustment;
 
+    @Builder.Default
+    private Boolean guideAccepted = false;
+
+    private Integer adults;
+
+    private Integer children;
+
+    @Builder.Default
+    private Integer depositPercent = 30;
+
+    private Long depositAmount;
+
+    @Builder.Default
+    private Boolean depositPaid = false;
+
+    @Column(length = 500)
+    private String cancelReason;
+
+    @Column(length = 8000)
+    private String confirmedSnapshotJson;
+
     @Enumerated(EnumType.STRING)
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)

@@ -1,11 +1,15 @@
+import { useState } from 'react';
 import { Avatar } from '@astryxdesign/core/Avatar';
 import { formatVnd, type Tour } from '../../api';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CameraIcon,
+  CheckIcon,
+  ExternalIcon,
   HeartIcon,
   MapPinIcon,
+  StarIcon,
   ZoomInIcon,
 } from '../../components/icon';
 import { SafeImage } from '../../components/ui/SafeImage';
@@ -39,6 +43,20 @@ export function TourDetailView({
     openGalleryAt,
     openStepPhoto,
   } = useTourDetail(tour);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleShareLink = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      if (navigator.clipboard && url) {
+        await navigator.clipboard.writeText(url);
+      }
+      setCopiedLink(true);
+      window.setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      setCopiedLink(false);
+    }
+  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -53,19 +71,39 @@ export function TourDetailView({
           <span>Quay lại khám phá</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => onToggleFavorite(tour.id)}
-          aria-pressed={isFavorite}
-          className="btn btn-ghost !py-2 !px-4 text-sm font-medium"
-        >
-          <HeartIcon
-            size={16}
-            filled={isFavorite}
-            className={isFavorite ? 'text-coral' : 'text-ink-2'}
-          />
-          <span>{isFavorite ? 'Đã lưu yêu thích' : 'Lưu yêu thích'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleShareLink()}
+            className="btn btn-ghost !py-2 !px-4 text-sm font-medium"
+          >
+            {copiedLink ? (
+              <>
+                <CheckIcon size={16} className="text-emerald" />
+                <span className="text-emerald">Đã sao chép liên kết</span>
+              </>
+            ) : (
+              <>
+                <ExternalIcon size={16} className="text-ink-2" />
+                <span>Chia sẻ</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onToggleFavorite(tour.id)}
+            aria-pressed={isFavorite}
+            className="btn btn-ghost !py-2 !px-4 text-sm font-medium"
+          >
+            <HeartIcon
+              size={16}
+              filled={isFavorite}
+              className={isFavorite ? 'text-coral' : 'text-ink-2'}
+            />
+            <span>{isFavorite ? 'Đã lưu yêu thích' : 'Lưu yêu thích'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Tiêu đề */}
@@ -77,6 +115,16 @@ export function TourDetailView({
           </span>
           <span className="text-ink-3">·</span>
           <span className="num text-ink">{tour.days} ngày</span>
+          {(tour.reviewCount ?? 0) > 0 && tour.averageRating != null && (
+            <>
+              <span className="text-ink-3">·</span>
+              <span className="inline-flex items-center gap-1 num text-ink font-semibold">
+                <StarIcon size={15} filled className="text-amber" />
+                <span>{tour.averageRating.toFixed(1)}</span>
+                <span className="text-ink-3 font-normal">({tour.reviewCount} đánh giá)</span>
+              </span>
+            </>
+          )}
         </div>
         <h1 className="text-3xl sm:text-[42px] font-semibold tracking-[-0.025em] text-ink leading-[1.12]">
           {tour.title}
@@ -257,6 +305,62 @@ export function TourDetailView({
                 </article>
               ))}
             </div>
+          </section>
+
+          {/* Đánh giá từ khách đã đi */}
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule pb-3">
+              <div>
+                <p className="text-sm font-medium text-ink-3">Trải nghiệm thực tế</p>
+                <h2 className="text-2xl font-semibold text-ink mt-1">
+                  Đánh giá từ khách đã đi
+                </h2>
+              </div>
+              {(tour.reviewCount ?? 0) > 0 && tour.averageRating != null && (
+                <div className="inline-flex items-center gap-1.5 text-base font-semibold text-ink num">
+                  <StarIcon size={18} filled className="text-amber" />
+                  <span>{tour.averageRating.toFixed(1)}</span>
+                  <span className="text-sm font-normal text-ink-3">
+                    ({tour.reviewCount} đánh giá)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {!tour.reviews || tour.reviews.length === 0 ? (
+              <div className="rounded-2xl border border-rule bg-surface p-6 text-sm text-ink-2">
+                Chưa có đánh giá nào cho hành trình này. Hãy là người đầu tiên trải nghiệm và chia sẻ cảm nhận!
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tour.reviews.map((rev, idx) => (
+                  <article
+                    key={`${rev.bookingCode}-${idx}`}
+                    className="rounded-2xl border border-rule bg-surface p-5 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-semibold text-ink">{rev.customerName}</div>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <StarIcon
+                            key={s}
+                            size={15}
+                            filled={s <= rev.rating}
+                            className={s <= rev.rating ? 'text-amber' : 'text-ink-3'}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {rev.comment && (
+                      <p className="text-[15px] text-ink-2 leading-relaxed">{rev.comment}</p>
+                    )}
+                    <div className="text-xs text-ink-3 num">
+                      {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString('vi-VN') : ''}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 

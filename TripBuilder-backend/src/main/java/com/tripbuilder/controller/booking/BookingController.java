@@ -1,5 +1,6 @@
 package com.tripbuilder.controller.booking;
 
+import com.tripbuilder.dto.request.booking.CancelBookingRequest;
 import com.tripbuilder.dto.request.booking.CreateBookingRequest;
 import com.tripbuilder.dto.request.booking.CustomizeRequest;
 import com.tripbuilder.dto.request.booking.RequoteRequest;
@@ -63,6 +64,8 @@ public class BookingController {
                 req.startDate(),
                 req.days(),
                 req.guests(),
+                req.adults(),
+                req.children(),
                 req.serviceMode(),
                 req.customerNote(),
                 req.customized(),
@@ -81,6 +84,16 @@ public class BookingController {
             throw new ForbiddenException("Chỉ khách hàng mới được gửi yêu cầu tuỳ chỉnh");
         }
         return ApiResponse.ok("Đã gửi điều chỉnh cho Tour Guide", bookingService.customize(id, req, user));
+    }
+
+    /** Tour Guide xác nhận lịch trống cho đơn đặt tour. */
+    @PostMapping("/{id}/accept")
+    public ApiResponse<BookingDto> accept(@PathVariable Long id, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.GUIDE) {
+            throw new ForbiddenException("Chỉ Tour Guide mới có quyền xác nhận lịch trống");
+        }
+        return ApiResponse.ok("Đã xác nhận lịch trống cho đơn đặt tour", bookingService.accept(id, user));
     }
 
     /** Tour Guide kiểm tra & gửi báo giá lại (hỗ trợ cả đơn đã chốt cần điều chỉnh). */
@@ -105,11 +118,33 @@ public class BookingController {
         return ApiResponse.ok("Đã chốt lịch trình chuyến đi!", bookingService.confirm(id, user));
     }
 
+    /** Từ chối điều chỉnh sau chốt và khôi phục về snapshot đã chốt. */
+    @PostMapping("/{id}/reject-change")
+    public ApiResponse<BookingDto> rejectChange(@PathVariable Long id, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.GUIDE && user.getRole() != Role.CUSTOMER) {
+            throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này");
+        }
+        return ApiResponse.ok("Đã khôi phục lịch trình đã chốt trước đó", bookingService.rejectChange(id, user));
+    }
+
+    /** Tour Guide hoặc Admin đánh dấu chuyến đi đã hoàn thành. */
+    @PostMapping("/{id}/complete")
+    public ApiResponse<BookingDto> complete(@PathVariable Long id, HttpServletRequest request) {
+        AppUser user = AuthInterceptor.requireCurrentUser(request);
+        if (user.getRole() != Role.GUIDE && user.getRole() != Role.ADMIN) {
+            throw new ForbiddenException("Chỉ Tour Guide hoặc Admin mới có quyền hoàn thành chuyến đi");
+        }
+        return ApiResponse.ok("Đã hoàn thành chuyến đi", bookingService.complete(id, user));
+    }
+
     /** Khách hàng hoặc Guide sở hữu đơn có thể huỷ đơn. */
     @PostMapping("/{id}/cancel")
-    public ApiResponse<BookingDto> cancel(@PathVariable Long id, HttpServletRequest request) {
+    public ApiResponse<BookingDto> cancel(@PathVariable Long id,
+                                          @RequestBody(required = false) CancelBookingRequest req,
+                                          HttpServletRequest request) {
         AppUser user = AuthInterceptor.requireCurrentUser(request);
-        return ApiResponse.ok("Đã huỷ đơn đặt tour", bookingService.cancel(id, user));
+        return ApiResponse.ok("Đã huỷ đơn đặt tour", bookingService.cancel(id, req, user));
     }
 
     /** Khách đánh giá sau khi chốt/hoàn thành chuyến đi. */

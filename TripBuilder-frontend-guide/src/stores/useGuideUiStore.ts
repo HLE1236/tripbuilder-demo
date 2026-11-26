@@ -2,7 +2,13 @@ import { create } from 'zustand';
 import type { Tour } from '@/api/types';
 
 export type NavSectionKey = 'overview' | 'bookings' | 'tours';
-export type BookingFilter = 'ALL' | 'ACTION' | 'REQUOTED' | 'CONFIRMED' | 'CANCELLED';
+export type BookingFilter =
+  | 'ALL'
+  | 'ACTION'
+  | 'REQUOTED'
+  | 'CONFIRMED'
+  | 'COMPLETED'
+  | 'CANCELLED';
 export type LedgerFilter = 'ALL' | 'ACTION' | 'REQUOTED' | 'CONFIRMED';
 
 interface GuideUiState {

@@ -1,19 +1,18 @@
 import { apiClient } from '@/api/client';
-import type { User } from '@/api/types';
+import type { AuthResponse } from '@/api/types';
 
-export interface LoginResponse {
-  token: string;
-  user: User;
-}
+export type LoginResponse = AuthResponse;
 
 export async function loginApi(
   email: string,
-  password: string
-): Promise<LoginResponse> {
+  password: string,
+  rememberMe = false
+): Promise<AuthResponse> {
   const res = await apiClient.post('/api/auth/login', {
     email,
     password,
     expectedRole: 'GUIDE',
+    rememberMe,
   });
   return res.data.data;
 }

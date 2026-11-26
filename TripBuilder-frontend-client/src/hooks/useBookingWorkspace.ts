@@ -9,6 +9,7 @@ import {
   useCancelBookingMutation,
   useConfirmBookingMutation,
   useCustomizeBookingMutation,
+  useRejectBookingChangeMutation,
   useReviewBookingMutation,
 } from './api';
 
@@ -20,7 +21,10 @@ export function useBookingWorkspace(
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDepositOpen, setConfirmDepositOpen] = useState(false);
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const [rating, setRating] = useState(booking.customerRating || 5);
   const [reviewText, setReviewText] = useState(booking.customerReview || '');
@@ -32,17 +36,20 @@ export function useBookingWorkspace(
   const confirmMutation = useConfirmBookingMutation();
   const cancelMutation = useCancelBookingMutation();
   const customizeMutation = useCustomizeBookingMutation();
+  const rejectChangeMutation = useRejectBookingChangeMutation();
   const reviewMutation = useReviewBookingMutation();
 
   const busy =
     confirmMutation.isPending ||
     cancelMutation.isPending ||
     customizeMutation.isPending ||
+    rejectChangeMutation.isPending ||
     reviewMutation.isPending;
 
   const st = statusMeta(booking.status);
   const mode = serviceModeMeta(booking.serviceMode);
   const isCancelled = booking.status === 'CANCELLED';
+  const isCompleted = booking.status === 'COMPLETED';
 
   const photos: PhotoItem[] = useMemo(() => {
     if (booking.tour.galleryItems && booking.tour.galleryItems.length > 0) {
@@ -63,11 +70,11 @@ export function useBookingWorkspace(
 
   const activeStepZeroBased = isCancelled
     ? 0
-    : booking.status === 'CONFIRMED'
+    : booking.status === 'CONFIRMED' || booking.status === 'COMPLETED'
       ? 3
-      : booking.status === 'REQUOTED' || booking.status === 'CHANGE_REQUESTED'
+      : booking.status === 'REQUOTED'
         ? 2
-        : booking.status === 'WAITING_REQUOTE'
+        : booking.status === 'WAITING_REQUOTE' || booking.status === 'CHANGE_REQUESTED'
           ? 1
           : 0;
 
@@ -81,8 +88,17 @@ export function useBookingWorkspace(
   const hasUnpricedCustom = booking.steps.some(
     (s) => s.noteType === 'CUSTOM' || (s.noteType !== 'REMOVED' && s.pricePerPerson == null)
   );
-  const canConfirm =
+  const waitingGuideAcceptOriginal =
+    booking.status === 'BOOKED_ORIGINAL' && booking.guideAccepted === false;
+  const showConfirmButton =
     (booking.status === 'BOOKED_ORIGINAL' || booking.status === 'REQUOTED') && !hasUnpricedCustom;
+  const canConfirm = showConfirmButton && !waitingGuideAcceptOriginal;
+  const canRejectChange =
+    Boolean(booking.postConfirmAdjustment) &&
+    Boolean(booking.hasConfirmedSnapshot) &&
+    (booking.status === 'CHANGE_REQUESTED' || booking.status === 'REQUOTED');
+  const depositAmount =
+    booking.depositAmount ?? Math.round(booking.totalPrice * ((booking.depositPercent ?? 30) / 100));
 
   const groupedDays = useMemo(() => {
     const maxDay = Math.max(booking.days, ...booking.steps.map((s) => s.dayNumber), 1);
@@ -107,10 +123,17 @@ export function useBookingWorkspace(
   const nextActionGuidance = useMemo(() => {
     switch (booking.status) {
       case 'BOOKED_ORIGINAL':
+        if (booking.guideAccepted === false) {
+          return {
+            tone: 'amber' as const,
+            title: 'Đang chờ Hướng dẫn viên xác nhận lịch trống',
+            body: `Guide ${booking.guide.fullName} đang kiểm tra lịch trống cho ngày khởi hành bạn chọn. Bạn sẽ nhận được thông báo ngay khi Guide xác nhận.`,
+          };
+        }
         return {
           tone: 'indigo' as const,
           title: 'Lịch trình chuẩn · Sẵn sàng chốt ngay',
-          body: 'Bạn có thể bấm "Chốt chuyến" ngay với giá niêm yết hoặc bấm "Chỉnh sửa lịch" để thay đổi dịch vụ theo ý muốn.',
+          body: 'Bạn có thể bấm "Chốt chuyến" để đặt cọc 30% giữ chỗ hoặc bấm "Chỉnh sửa lịch" để thay đổi dịch vụ theo ý muốn.',
         };
       case 'WAITING_REQUOTE':
         return {
@@ -139,14 +162,22 @@ export function useBookingWorkspace(
       case 'CONFIRMED':
         return {
           tone: 'emerald' as const,
-          title: 'Hồ sơ chuyến đi đã được chốt & giữ chỗ',
+          title: 'Chuyến đi đã được chốt & giữ chỗ',
           body: 'Chuyến đi đã sẵn sàng khởi hành. Nếu lịch có phát sinh, bạn vẫn có thể gửi yêu cầu điều chỉnh sau chốt bất cứ lúc nào.',
+        };
+      case 'COMPLETED':
+        return {
+          tone: 'emerald' as const,
+          title: 'Chuyến đi đã hoàn thành',
+          body: 'Cảm ơn bạn đã đồng hành cùng TripBuilder! Hãy để lại đánh giá trải nghiệm cho Hướng dẫn viên bên dưới.',
         };
       case 'CANCELLED':
         return {
           tone: 'crimson' as const,
-          title: 'Đơn đặt tour đã huỷ',
-          body: 'Hồ sơ này đã đóng. Bạn có thể quay lại danh sách để đặt một hành trình mới.',
+          title: 'Chuyến đi đã huỷ',
+          body: booking.cancelReason
+            ? `Lý do huỷ: ${booking.cancelReason}`
+            : 'Chuyến đi này đã đóng. Bạn có thể quay lại danh sách để đặt một hành trình mới.',
         };
     }
   }, [booking]);
@@ -175,7 +206,8 @@ export function useBookingWorkspace(
     setError('');
     try {
       const updated = await confirmMutation.mutateAsync(booking.id);
-      setConfirmCancel(false);
+      setConfirmDepositOpen(false);
+      setPolicyAccepted(false);
       onUpdated(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể chốt chuyến');
@@ -185,11 +217,26 @@ export function useBookingWorkspace(
   const handleCancel = async () => {
     setError('');
     try {
-      const updated = await cancelMutation.mutateAsync(booking.id);
-      setConfirmCancel(false);
+      const trimmedReason = cancelReason.trim();
+      const updated = await cancelMutation.mutateAsync({
+        bookingId: booking.id,
+        reason: trimmedReason || undefined,
+      });
+      setCancelModalOpen(false);
+      setCancelReason('');
       onUpdated(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể huỷ đơn');
+    }
+  };
+
+  const handleRejectChange = async () => {
+    setError('');
+    try {
+      const updated = await rejectChangeMutation.mutateAsync(booking.id);
+      onUpdated(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể huỷ yêu cầu điều chỉnh');
     }
   };
 
@@ -240,8 +287,14 @@ export function useBookingWorkspace(
     error,
     editOpen,
     setEditOpen,
-    confirmCancel,
-    setConfirmCancel,
+    confirmDepositOpen,
+    setConfirmDepositOpen,
+    policyAccepted,
+    setPolicyAccepted,
+    cancelModalOpen,
+    setCancelModalOpen,
+    cancelReason,
+    setCancelReason,
     rating,
     setRating,
     reviewText,
@@ -254,10 +307,15 @@ export function useBookingWorkspace(
     st,
     mode,
     isCancelled,
+    isCompleted,
     photos,
     activeStepZeroBased,
     canCustomerEdit,
+    waitingGuideAcceptOriginal,
+    showConfirmButton,
     canConfirm,
+    canRejectChange,
+    depositAmount,
     groupedDays,
     serviceDiffPerPerson,
     serviceDiffTotal,
@@ -266,6 +324,7 @@ export function useBookingWorkspace(
     handleRefresh,
     handleConfirm,
     handleCancel,
+    handleRejectChange,
     acceptAlternative,
     handleReview,
   };

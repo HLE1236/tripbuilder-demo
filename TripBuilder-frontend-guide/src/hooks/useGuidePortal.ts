@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getMeApi, loginApi, setUnauthorizedHandler, type Booking, type Tour } from '@/api';
+import { getMeApi, logoutApi, setUnauthorizedHandler, type Booking, type Tour } from '@/api';
 import { statusMeta } from '@/config/constants/meta';
-import { getAuthToken } from '@/config/storage/auth-storage';
+import { getAuthToken, getRefreshToken } from '@/config/storage/auth-storage';
 import {
   bookingKeys,
   tourKeys,
   useBookingsQuery,
   useDeleteTourMutation,
   useRegionsQuery,
+  useToggleTourStatusMutation,
   useToursQuery,
 } from '@/hooks/api';
 import { useAuthStore, useGuideUiStore, useThemeStore } from '@/stores';
@@ -52,9 +53,15 @@ export function useGuidePortal() {
 
   const [initialParams] = useState(() => {
     const params = new URLSearchParams(window.location.search);
+    const urlSection = params.get('section');
+    const urlBooking = Number(params.get('booking'));
     return {
-      demoEmail: params.get('demoEmail')?.trim() || '',
       bookingCode: params.get('bookingCode')?.trim() || '',
+      section:
+        urlSection === 'overview' || urlSection === 'bookings' || urlSection === 'tours'
+          ? (urlSection as 'overview' | 'bookings' | 'tours')
+          : null,
+      bookingId: Number.isFinite(urlBooking) && urlBooking > 0 ? urlBooking : null,
     };
   });
 
@@ -63,6 +70,10 @@ export function useGuidePortal() {
   );
 
   const handleLogout = useCallback(() => {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      void logoutApi({ refreshToken }).catch(() => {});
+    }
     logout();
     resetSessionUi();
     queryClient.removeQueries({ queryKey: bookingKeys.all });
@@ -81,40 +92,6 @@ export function useGuidePortal() {
 
   useEffect(() => {
     let active = true;
-    const demoEmail = initialParams.demoEmail;
-
-    const clearQueryParams = () => {
-      if (window.location.search) {
-        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-      }
-    };
-
-    if (demoEmail) {
-      setAuthChecking(true);
-      loginApi(demoEmail, '123456')
-        .then((res) => {
-          if (!active) return;
-          setSession(res.token, res.user);
-          resetSessionUi();
-          clearQueryParams();
-        })
-        .catch((err) => {
-          if (!active) return;
-          setAuthError(
-            err instanceof Error ? err.message : 'Không thể chuyển nhanh tài khoản Guide'
-          );
-          handleLogout();
-          clearQueryParams();
-        })
-        .finally(() => {
-          if (active) setAuthChecking(false);
-        });
-      return () => {
-        active = false;
-      };
-    }
-
-    clearQueryParams();
     const token = getAuthToken();
     if (!token) {
       setAuthChecking(false);
@@ -128,6 +105,12 @@ export function useGuidePortal() {
         if (u.role !== 'GUIDE') {
           handleLogout();
           return;
+        }
+        if (initialParams.section) {
+          setSection(initialParams.section);
+        }
+        if (initialParams.bookingId) {
+          openBookingWorkspace(initialParams.bookingId);
         }
         setUser(u);
       })
@@ -143,11 +126,11 @@ export function useGuidePortal() {
     };
   }, [
     handleLogout,
-    initialParams.demoEmail,
-    resetSessionUi,
+    initialParams.bookingId,
+    initialParams.section,
+    openBookingWorkspace,
     setAuthChecking,
-    setAuthError,
-    setSession,
+    setSection,
     setUser,
   ]);
 
@@ -156,7 +139,9 @@ export function useGuidePortal() {
   const toursQuery = useToursQuery(user?.id, isAuthenticated);
   const bookingsQuery = useBookingsQuery(isAuthenticated);
   const deleteTourMutation = useDeleteTourMutation(user?.id);
+  const toggleTourStatusMutation = useToggleTourStatusMutation(user?.id);
   const [confirmDeleteTourId, setConfirmDeleteTourId] = useState<number | null>(null);
+  const [togglingTourId, setTogglingTourId] = useState<number | null>(null);
   const [actionError, setActionError] = useState('');
 
   const applyingPopstateRef = useRef(false);
@@ -241,6 +226,26 @@ export function useGuidePortal() {
     [deleteTourMutation]
   );
 
+  const handleToggleTourStatus = useCallback(
+    async (tour: Tour) => {
+      setActionError('');
+      setTogglingTourId(tour.id);
+      try {
+        await toggleTourStatusMutation.mutateAsync({
+          tourId: tour.id,
+          active: !tour.active,
+        });
+      } catch (err) {
+        setActionError(
+          err instanceof Error ? err.message : 'Không thể cập nhật trạng thái tour'
+        );
+      } finally {
+        setTogglingTourId(null);
+      }
+    },
+    [toggleTourStatusMutation]
+  );
+
   const loadData = useCallback(async () => {
     if (!user) return;
     setAuthError('');
@@ -282,14 +287,22 @@ export function useGuidePortal() {
     [bookings]
   );
 
+  const completedList = useMemo(
+    () => bookings.filter((b) => b.status === 'COMPLETED'),
+    [bookings]
+  );
+
   const cancelledList = useMemo(
     () => bookings.filter((b) => b.status === 'CANCELLED'),
     [bookings]
   );
 
   const confirmedRevenue = useMemo(
-    () => confirmedList.reduce((acc, b) => acc + (b.totalPrice || 0), 0),
-    [confirmedList]
+    () =>
+      bookings
+        .filter((b) => b.status === 'CONFIRMED' || b.status === 'COMPLETED')
+        .reduce((acc, b) => acc + (b.totalPrice || 0), 0),
+    [bookings]
   );
 
   const ledgerFilteredBookings = useMemo(() => {
@@ -305,6 +318,7 @@ export function useGuidePortal() {
       if (bookingFilter === 'ACTION' && !statusMeta(b.status).actionNeeded) return false;
       if (bookingFilter === 'REQUOTED' && b.status !== 'REQUOTED') return false;
       if (bookingFilter === 'CONFIRMED' && b.status !== 'CONFIRMED') return false;
+      if (bookingFilter === 'COMPLETED' && b.status !== 'COMPLETED') return false;
       if (bookingFilter === 'CANCELLED' && b.status !== 'CANCELLED') return false;
       if (!q) return true;
       return (
@@ -379,6 +393,7 @@ export function useGuidePortal() {
     actionQueue,
     requotedList,
     confirmedList,
+    completedList,
     cancelledList,
     confirmedRevenue,
     ledgerFilteredBookings,
@@ -389,5 +404,7 @@ export function useGuidePortal() {
     setConfirmDeleteTourId,
     deletingTourId: deleteTourMutation.isPending ? confirmDeleteTourId : null,
     handleDeleteTour,
+    togglingTourId,
+    handleToggleTourStatus,
   };
 }

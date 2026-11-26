@@ -1,11 +1,5 @@
 import type { BookingStatus, PresetCategory, UserRole } from '../../api/types';
 
-export const PORTAL_LINKS = {
-  client: import.meta.env.VITE_CLIENT_URL || 'http://localhost:5173',
-  guide: import.meta.env.VITE_GUIDE_URL || 'http://localhost:5174',
-  admin: import.meta.env.VITE_ADMIN_URL || 'http://localhost:5175',
-} as const;
-
 export const ROLE_META: Record<UserRole, { label: string; tagClass: string }> = {
   ADMIN: { label: 'Quản trị viên', tagClass: 'tag-terracotta' },
   GUIDE: { label: 'Tour Guide', tagClass: 'tag-jade' },
@@ -60,6 +54,8 @@ export function bookingStatusMeta(status: BookingStatus | string): {
       return { label: 'Đã gửi báo giá', tagClass: 'tag-terracotta' };
     case 'CONFIRMED':
       return { label: 'Đã chốt', tagClass: 'tag-forest' };
+    case 'COMPLETED':
+      return { label: 'Đã hoàn thành', tagClass: 'tag-forest' };
     case 'CANCELLED':
       return { label: 'Đã huỷ', tagClass: 'tag-crimson' };
     default:

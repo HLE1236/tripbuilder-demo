@@ -101,6 +101,10 @@ export function useUsersManager() {
     }
 
     const region = regions.find((r) => String(r.id) === effectiveRegionId);
+    if ((!editingUser || editingUser.role === 'GUIDE') && !region) {
+      setFormError('Vui lòng chọn vùng phụ trách cho Tour Guide.');
+      return;
+    }
     const parsedYears = Number(yearsExperience);
     const cleanYears = Number.isFinite(parsedYears) && parsedYears >= 0 ? parsedYears : undefined;
 

@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getMeApi, loginApi } from '../api/auth';
-import { getBookingByIdApi } from '../api/booking';
+import { getMeApi, logoutApi } from '../api/auth';
+import { createBookingApi, getBookingByIdApi, type CreateBookingPayload } from '../api/booking';
 import { setUnauthorizedHandler } from '../api/interceptor';
-import type { Booking, PhotoItem, Tour, User } from '../api/types';
-import { getAuthToken } from '../config/storage/auth-storage';
+import type { AuthResponse, Booking, PhotoItem, Tour } from '../api/types';
+import { getAuthToken, getRefreshToken } from '../config/storage/auth-storage';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useClientUiStore } from '../stores/useClientUiStore';
 import { useThemeStore } from '../stores/useThemeStore';
+import { matchesVietnameseQuery } from '../utils/search';
 import { tourToPhotoItems } from '../utils/tour';
 import {
+  authKeys,
   bookingKeys,
+  favoriteKeys,
   useBookingsQuery,
   useFavoritesQuery,
   useRegionPhotosQuery,
@@ -19,7 +22,7 @@ import {
   useToursQuery,
 } from './api';
 
-export function useClientPortal() {
+export function useClientPortal(onAutoBookingCreated?: (booking: Booking) => void) {
   const queryClient = useQueryClient();
 
   const theme = useThemeStore((s) => s.theme);
@@ -31,6 +34,8 @@ export function useClientPortal() {
   const setUser = useAuthStore((s) => s.setUser);
   const setAuthLoading = useAuthStore((s) => s.setAuthLoading);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const openAuthModal = useAuthStore((s) => s.openAuthModal);
+  const closeAuthModal = useAuthStore((s) => s.closeAuthModal);
 
   const tab = useClientUiStore((s) => s.tab);
   const setTab = useClientUiStore((s) => s.setTab);
@@ -65,51 +70,39 @@ export function useClientPortal() {
   const resetOnLogout = useClientUiStore((s) => s.resetOnLogout);
 
   const [refreshingBookingId, setRefreshingBookingId] = useState<number | null>(null);
+  const [pendingBookingDraft, setPendingBookingDraft] = useState<Omit<
+    CreateBookingPayload,
+    'customerId'
+  > | null>(null);
 
-  const initialDemoEmailRef = useRef<string | null>(null);
-  if (initialDemoEmailRef.current === null && typeof window !== 'undefined') {
-    initialDemoEmailRef.current =
-      new URLSearchParams(window.location.search).get('demoEmail')?.trim() || '';
-  }
-
-  const handleLogout = useCallback(() => {
+  const clearLocalSession = useCallback(() => {
     clearSession();
     resetOnLogout();
-    queryClient.clear();
+    queryClient.removeQueries({ queryKey: bookingKeys.all });
+    queryClient.removeQueries({ queryKey: favoriteKeys.all });
+    queryClient.removeQueries({ queryKey: authKeys.all });
   }, [clearSession, resetOnLogout, queryClient]);
 
+  const handleLogout = useCallback(() => {
+    const rt = useAuthStore.getState().refreshToken ?? getRefreshToken();
+    if (rt) {
+      void logoutApi(rt).catch(() => {});
+    }
+    clearLocalSession();
+  }, [clearLocalSession]);
+
   useEffect(() => {
-    setUnauthorizedHandler(handleLogout);
+    setUnauthorizedHandler(clearLocalSession);
     return () => setUnauthorizedHandler(null);
-  }, [handleLogout]);
+  }, [clearLocalSession]);
 
   useEffect(() => {
     let active = true;
-    const demoEmail = initialDemoEmailRef.current || '';
-
-    const clearQueryParams = () => {
-      if (window.location.search) {
-        const cleanUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState({}, '', cleanUrl);
-      }
-    };
 
     const restoreSession = async () => {
-      if (demoEmail) {
-        try {
-          const res = await loginApi({ email: demoEmail, password: '123456' });
-          if (!active) return;
-          setSession(res.token, res.user);
-          clearQueryParams();
-          return;
-        } catch {
-          // Fall back to existing token check
-        }
-      }
-
-      clearQueryParams();
       const token = getAuthToken();
-      if (!token) {
+      const rt = getRefreshToken();
+      if (!token && !rt) {
         if (active) setAuthLoading(false);
         return;
       }
@@ -118,12 +111,12 @@ export function useClientPortal() {
         const me = await getMeApi();
         if (!active) return;
         if (me.role !== 'CUSTOMER') {
-          handleLogout();
+          clearLocalSession();
         } else {
           setUser(me);
         }
       } catch {
-        if (active) handleLogout();
+        if (active) clearLocalSession();
       } finally {
         if (active) setAuthLoading(false);
       }
@@ -133,12 +126,14 @@ export function useClientPortal() {
     return () => {
       active = false;
     };
-  }, [handleLogout, setAuthLoading, setSession, setUser]);
+  }, [clearLocalSession, setAuthLoading, setUser]);
 
   const isAuthenticated = Boolean(user);
 
-  const regionsQuery = useRegionsQuery(isAuthenticated);
-  const toursQuery = useToursQuery(undefined, isAuthenticated);
+  // Public catalog queries are always enabled so guests can browse & search freely
+  const regionsQuery = useRegionsQuery(true);
+  const toursQuery = useToursQuery(undefined, true);
+  // Private queries are gated on authentication
   const bookingsQuery = useBookingsQuery(isAuthenticated);
   const favoritesQuery = useFavoritesQuery(isAuthenticated);
 
@@ -148,12 +143,14 @@ export function useClientPortal() {
   const favoriteIds = favoritesQuery.data ?? [];
 
   const loadingData =
-    regionsQuery.isLoading || toursQuery.isLoading || bookingsQuery.isLoading;
+    regionsQuery.isLoading ||
+    toursQuery.isLoading ||
+    (isAuthenticated && bookingsQuery.isLoading);
 
   const queryError =
     regionsQuery.error?.message ||
     toursQuery.error?.message ||
-    bookingsQuery.error?.message ||
+    (isAuthenticated ? bookingsQuery.error?.message : '') ||
     '';
 
   const error = flashError || queryError;
@@ -171,46 +168,6 @@ export function useClientPortal() {
     setPendingBookingCode(null);
   }, [bookings, pendingBookingCode, setPendingBookingCode, setSelectedBookingId, setTab]);
 
-  // Sync tab / selectedTourId / selectedBookingId with URL query params + browser Back/Forward
-  const applyingPopstateRef = useRef(false);
-
-  useEffect(() => {
-    if (!isAuthenticated || typeof window === 'undefined') return;
-    const applyFromUrl = () => {
-      const params = new URLSearchParams(window.location.search);
-      const urlTab = params.get('tab');
-      const urlTour = Number(params.get('tour'));
-      const urlBooking = Number(params.get('booking'));
-
-      applyingPopstateRef.current = true;
-      if (urlTab === 'explore' || urlTab === 'saved' || urlTab === 'trips') {
-        setTab(urlTab);
-      }
-      setSelectedTourId(Number.isFinite(urlTour) && urlTour > 0 ? urlTour : null);
-      setSelectedBookingId(Number.isFinite(urlBooking) && urlBooking > 0 ? urlBooking : null);
-      queueMicrotask(() => {
-        applyingPopstateRef.current = false;
-      });
-    };
-
-    window.addEventListener('popstate', applyFromUrl);
-    return () => window.removeEventListener('popstate', applyFromUrl);
-  }, [isAuthenticated, setSelectedBookingId, setSelectedTourId, setTab]);
-
-  useEffect(() => {
-    if (!isAuthenticated || typeof window === 'undefined' || applyingPopstateRef.current) return;
-    const params = new URLSearchParams();
-    if (tab !== 'explore') params.set('tab', tab);
-    if (selectedTourId) params.set('tour', String(selectedTourId));
-    if (selectedBookingId) params.set('booking', String(selectedBookingId));
-    const qs = params.toString();
-    const targetUrl = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
-    const currentUrl = window.location.pathname + window.location.search + window.location.hash;
-    if (targetUrl !== currentUrl) {
-      window.history.pushState({}, '', targetUrl);
-    }
-  }, [isAuthenticated, tab, selectedTourId, selectedBookingId]);
-
   const selectedRegion = useMemo(
     () => (regionFilter === 'ALL' ? null : regions.find((r) => r.id === regionFilter) ?? null),
     [regions, regionFilter]
@@ -219,7 +176,7 @@ export function useClientPortal() {
   const regionPhotosQuery = useRegionPhotosQuery(
     selectedRegion?.id,
     undefined,
-    isAuthenticated && Boolean(selectedRegion)
+    Boolean(selectedRegion)
   );
 
   const selectedRegionPhotos = useMemo(() => {
@@ -243,17 +200,17 @@ export function useClientPortal() {
   );
 
   const filteredTours = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim();
     const list = tours.filter((t) => {
       if (regionFilter !== 'ALL' && t.regionId !== regionFilter) return false;
       if (durationFilter === '2' && t.days !== 2) return false;
       if (durationFilter === '3+' && t.days < 3) return false;
       if (!q) return true;
       return (
-        t.title.toLowerCase().includes(q) ||
-        t.regionName.toLowerCase().includes(q) ||
-        t.province.toLowerCase().includes(q) ||
-        t.guide.fullName.toLowerCase().includes(q)
+        matchesVietnameseQuery(t.title, q) ||
+        matchesVietnameseQuery(t.regionName, q) ||
+        matchesVietnameseQuery(t.province, q) ||
+        matchesVietnameseQuery(t.guide.fullName, q)
       );
     });
 
@@ -274,6 +231,10 @@ export function useClientPortal() {
   const toggleFavoriteMutation = useToggleFavoriteMutation();
 
   const toggleFavorite = async (tourId: number) => {
+    if (!user) {
+      openAuthModal('login', { type: 'favorite', tourId });
+      return;
+    }
     const isCurrentlySaved = favoriteIds.includes(tourId);
     setFlashError('');
     try {
@@ -281,6 +242,17 @@ export function useClientPortal() {
     } catch (e) {
       setFlashError(e instanceof Error ? e.message : 'Không thể cập nhật mục đã lưu');
     }
+  };
+
+  const requestCustomize = (tourId: number) => {
+    setFlashError('');
+    setCustomizeTourId(tourId);
+  };
+
+  const requireAuthForBookingSubmit = (draft: Omit<CreateBookingPayload, 'customerId'>) => {
+    setFlashError('');
+    setPendingBookingDraft(draft);
+    openAuthModal('login', { type: 'submit_booking', tourId: draft.tourId });
   };
 
   const openTourLightbox = (tour: Tour, index = 0) => {
@@ -324,8 +296,38 @@ export function useClientPortal() {
     setTab('trips');
   };
 
-  const handleLoginSuccess = (token: string, loggedInUser: User) => {
-    setSession(token, loggedInUser);
+  const handleAuthSuccess = (data: AuthResponse, rememberMe = true) => {
+    const pendingIntent = useAuthStore.getState().authModal.pendingIntent;
+    setSession(data.token, data.user, data.refreshToken, rememberMe);
+    closeAuthModal();
+
+    if (pendingIntent) {
+      if (pendingIntent.type === 'submit_booking' && pendingBookingDraft) {
+        const draftToSubmit = pendingBookingDraft;
+        setPendingBookingDraft(null);
+        setFlashError('');
+        void createBookingApi({
+          ...draftToSubmit,
+          customerId: data.user.id,
+        })
+          .then((created) => {
+            handleBookingCreated(created);
+            queryClient.invalidateQueries({ queryKey: bookingKeys.list() });
+            onAutoBookingCreated?.(created);
+          })
+          .catch((e) => {
+            setFlashError(
+              e instanceof Error ? e.message : 'Không thể gửi yêu cầu đặt chuyến sau khi đăng nhập'
+            );
+          });
+      } else if (pendingIntent.type === 'customize') {
+        setCustomizeTourId(pendingIntent.tourId);
+      } else if (pendingIntent.type === 'favorite') {
+        void toggleFavoriteMutation
+          .mutateAsync({ tourId: pendingIntent.tourId, isCurrentlySaved: false })
+          .catch(() => {});
+      }
+    }
   };
 
   const scrollToCatalog = () => {
@@ -347,9 +349,11 @@ export function useClientPortal() {
     theme,
     toggleTheme,
     user,
+    setUser,
     authLoading,
-    handleLoginSuccess,
+    handleAuthSuccess,
     handleLogout,
+    openAuthModal,
 
     tab,
     setTab,
@@ -376,6 +380,8 @@ export function useClientPortal() {
     setSelectedTourId,
     customizeTour,
     setCustomizeTourId,
+    requestCustomize,
+    requireAuthForBookingSubmit,
     selectedBooking,
     setSelectedBookingId,
 
@@ -388,6 +394,7 @@ export function useClientPortal() {
 
     loadingData,
     error,
+    flashError,
     refreshingBookingId,
     pendingActionCount,
     hasActiveFilters,

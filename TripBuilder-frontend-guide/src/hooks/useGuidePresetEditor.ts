@@ -42,11 +42,17 @@ export function useGuidePresetEditor({
   const matchedGuideRegion =
     regions.find((r) => user?.regionId != null && r.id === user.regionId) ??
     regions.find((r) => user?.regionName && r.name === user.regionName);
+  const hasGuideRegion = Boolean(user?.regionId && matchedGuideRegion);
+  const isRegionLocked = true;
+  const lockedRegionName =
+    matchedGuideRegion?.name || user?.regionName || editingTour?.regionName || '';
   const defaultRegion = matchedGuideRegion ?? regions[0];
   const defaultRegionCover = defaultRegion?.imageUrl || DEFAULT_TRAVEL_IMAGE;
 
   const [regionId, setRegionId] = useState(
-    String(editingTour?.regionId || defaultRegion?.id || 1)
+    user?.regionId
+      ? String(user.regionId)
+      : String(matchedGuideRegion?.id || editingTour?.regionId || defaultRegion?.id || '')
   );
   const [title, setTitle] = useState(editingTour?.title || '');
   const [description, setDescription] = useState(editingTour?.description || '');
@@ -105,6 +111,7 @@ export function useGuidePresetEditor({
   );
 
   const handleRegionChange = (val: string) => {
+    if (isRegionLocked) return;
     setRegionId(val);
     const reg = regions.find((r) => String(r.id) === val);
     if (reg && !isEdit) {
@@ -239,6 +246,10 @@ export function useGuidePresetEditor({
   };
 
   const handleSave = async () => {
+    if (!hasGuideRegion || !user?.regionId) {
+      setError('Tài khoản Guide chưa được gán vùng phụ trách. Vui lòng liên hệ Admin.');
+      return;
+    }
     if (!title.trim()) {
       setError('Vui lòng nhập tên tour mẫu');
       return;
@@ -292,6 +303,9 @@ export function useGuidePresetEditor({
 
   return {
     isEdit,
+    hasGuideRegion,
+    isRegionLocked,
+    lockedRegionName,
     regionId,
     handleRegionChange,
     title,

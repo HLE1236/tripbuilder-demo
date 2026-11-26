@@ -78,12 +78,17 @@ export function BookingRequoteWorkspace({
     setPendingDayShrink,
     confirmCancelOpen,
     setConfirmCancelOpen,
+    cancelReason,
+    setCancelReason,
     options,
     busy,
     error,
     st,
     mode,
     isCancelled,
+    isCompleted,
+    isConfirmed,
+    isLocked,
     groupAdjustmentSigned,
     perPerson,
     rawTotalPreview,
@@ -102,6 +107,9 @@ export function BookingRequoteWorkspace({
     applyDayShrink,
     handleSendRequote,
     handleCancel,
+    handleAcceptBooking,
+    handleRejectChange,
+    handleCompleteBooking,
   } = useBookingRequote({ booking, onUpdated });
 
   return (
@@ -132,6 +140,19 @@ export function BookingRequoteWorkspace({
               Điều chỉnh sau chốt
             </span>
           )}
+          {(isConfirmed || isCompleted) &&
+            booking.depositAmount != null &&
+            booking.depositAmount > 0 && (
+              <span
+                className={`tag normal-case tracking-normal font-medium ${
+                  booking.depositPaid ? 'tag-forest' : 'tag-ochre'
+                }`}
+              >
+                {booking.depositPaid
+                  ? `Đã cọc ${formatVnd(booking.depositAmount)}`
+                  : `Chờ cọc ${formatVnd(booking.depositAmount)}`}
+              </span>
+            )}
         </div>
       </div>
 
@@ -162,7 +183,7 @@ export function BookingRequoteWorkspace({
         </div>
       )}
 
-      {!isCancelled && unpricedCustomSteps.length > 0 && (
+      {!isLocked && unpricedCustomSteps.length > 0 && (
         <div className="rounded-xl border border-coral bg-coral-soft px-5 py-3.5 flex items-start gap-3 text-base text-coral">
           <CustomIcon size={18} strokeWidth={1.5} className="mt-0.5 shrink-0" />
           <div>
@@ -199,10 +220,13 @@ export function BookingRequoteWorkspace({
                 />
                 <span className="font-semibold text-ink">{booking.customer.fullName}</span>
                 {booking.customer.phone && (
-                  <span className="inline-flex items-center gap-1 num font-medium text-ink-2">
+                  <a
+                    href={`tel:${booking.customer.phone}`}
+                    className="inline-flex items-center gap-1 num font-medium text-ink-2 hover:text-coral transition-colors"
+                  >
                     <PhoneIcon size={16} strokeWidth={1.5} className="text-ink-3" />
                     {booking.customer.phone}
-                  </span>
+                  </a>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-medium text-ink-2">
@@ -217,6 +241,12 @@ export function BookingRequoteWorkspace({
                 <span className="inline-flex items-center gap-1.5 num">
                   <UsersIcon size={16} strokeWidth={1.5} className="text-ink-3" />
                   {guests} khách
+                  {booking.adults != null && (
+                    <span className="text-ink-3 font-normal">
+                      ({booking.adults} người lớn
+                      {booking.children ? `, ${booking.children} trẻ em` : ''})
+                    </span>
+                  )}
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <TagIcon size={16} strokeWidth={1.5} className="text-ink-3" />
@@ -254,9 +284,16 @@ export function BookingRequoteWorkspace({
                 )}
               </div>
             ) : (
-              <div className="p-4 rounded-xl border border-crimson bg-crimson-soft text-crimson text-sm font-medium flex items-center gap-2.5">
-                <VoidIcon size={18} strokeWidth={1.5} />
-                <span>Đơn đặt tour này đã được hủy và đóng sổ</span>
+              <div className="p-4 rounded-xl border border-crimson bg-crimson-soft text-crimson text-sm font-medium space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <VoidIcon size={18} strokeWidth={1.5} />
+                  <span>Đơn đặt tour này đã được hủy và đóng sổ</span>
+                </div>
+                {booking.cancelReason && (
+                  <div className="text-[13px] font-normal pl-7">
+                    Lý do: {booking.cancelReason}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -277,7 +314,7 @@ export function BookingRequoteWorkspace({
                 sẵn để báo giá nhanh.
               </p>
             </div>
-            {!isCancelled && (
+            {!isLocked && (
               <button
                 type="button"
                 onClick={() => addGuideStepForDay(1)}
@@ -315,7 +352,7 @@ export function BookingRequoteWorkspace({
                     <span className="num text-base font-semibold text-rose-300">
                       {formatVnd(dayPerPerson)}/khách
                     </span>
-                    {!isCancelled && (
+                    {!isLocked && (
                       <button
                         type="button"
                         onClick={() => addGuideStepForDay(dayNum)}
@@ -385,7 +422,7 @@ export function BookingRequoteWorkspace({
 
                             <div className="flex items-center gap-3 shrink-0">
                               <span className="num text-base font-semibold text-crimson">0đ</span>
-                              {!isCancelled && (
+                              {!isLocked && (
                                 <button
                                   type="button"
                                   onClick={() => handleRestoreStep(s)}
@@ -446,7 +483,7 @@ export function BookingRequoteWorkspace({
                               <span className="num text-lg font-semibold text-coral">
                                 {formatVnd(s.pricePerPerson)}
                               </span>
-                              {!isCancelled && (
+                              {!isLocked && (
                                 <>
                                   <button
                                     type="button"
@@ -520,7 +557,7 @@ export function BookingRequoteWorkspace({
                               )}
                             </div>
 
-                            {!isCancelled && (
+                            {!isLocked && (
                               <div className="flex items-center gap-2">
                                 {s.noteType === 'PRESET' && (
                                   <button
@@ -551,7 +588,7 @@ export function BookingRequoteWorkspace({
                                 Ngày
                               </label>
                               <select
-                                disabled={isCancelled}
+                                disabled={isLocked}
                                 value={s.dayNumber}
                                 onChange={(e) =>
                                   updateStepByKey(s._key, {
@@ -573,7 +610,7 @@ export function BookingRequoteWorkspace({
                                 Nhóm dịch vụ
                               </label>
                               <select
-                                disabled={isCancelled}
+                                disabled={isLocked}
                                 value={s.category}
                                 onChange={(e) =>
                                   updateStepByKey(s._key, { category: e.target.value })
@@ -594,7 +631,7 @@ export function BookingRequoteWorkspace({
                               </label>
                               <input
                                 type="text"
-                                disabled={isCancelled}
+                                disabled={isLocked}
                                 value={s.title}
                                 onChange={(e) =>
                                   updateStepByKey(s._key, {
@@ -615,7 +652,7 @@ export function BookingRequoteWorkspace({
                                 type="number"
                                 step={50_000}
                                 min={0}
-                                disabled={isCancelled}
+                                disabled={isLocked}
                                 value={s.pricePerPerson}
                                 onChange={(e) => handlePriceChange(s, Number(e.target.value))}
                                 className={`field py-2 text-right num text-base font-semibold ${
@@ -626,7 +663,7 @@ export function BookingRequoteWorkspace({
                           </div>
 
                           {/* Chip chọn giá nhanh cho dòng CUSTOM / phát sinh */}
-                          {!isCancelled &&
+                          {!isLocked &&
                             (s.noteType === 'CUSTOM' ||
                               s._wasCustom ||
                               s.noteType === 'GUIDE') && (
@@ -677,7 +714,7 @@ export function BookingRequoteWorkspace({
                               )}
                             </div>
 
-                            {!isCancelled && sameCatOpts.length > 0 && (
+                            {!isLocked && sameCatOpts.length > 0 && (
                               <div className="sm:w-80">
                                 <select
                                   value=""
@@ -732,7 +769,7 @@ export function BookingRequoteWorkspace({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      disabled={isCancelled || days <= 1}
+                      disabled={isLocked || days <= 1}
                       onClick={() => handleRequestDaysChange(days - 1)}
                       aria-label="Giảm số ngày"
                       className="btn btn-ghost px-3 py-2 text-sm font-medium"
@@ -744,7 +781,7 @@ export function BookingRequoteWorkspace({
                     </span>
                     <button
                       type="button"
-                      disabled={isCancelled || days >= 10}
+                      disabled={isLocked || days >= 10}
                       onClick={() => handleRequestDaysChange(days + 1)}
                       aria-label="Tăng số ngày"
                       className="btn btn-ghost px-3 py-2 text-sm font-medium"
@@ -766,7 +803,7 @@ export function BookingRequoteWorkspace({
                     type="number"
                     min={1}
                     max={30}
-                    disabled={isCancelled}
+                    disabled={isLocked}
                     value={guests}
                     onChange={(e) =>
                       setGuests(Math.min(30, Math.max(1, Number(e.target.value) || 1)))
@@ -816,7 +853,7 @@ export function BookingRequoteWorkspace({
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    disabled={isCancelled}
+                    disabled={isLocked}
                     aria-pressed={adjMode === 'none'}
                     onClick={() => {
                       setAdjMode('none');
@@ -828,7 +865,7 @@ export function BookingRequoteWorkspace({
                   </button>
                   <button
                     type="button"
-                    disabled={isCancelled}
+                    disabled={isLocked}
                     aria-pressed={adjMode === 'discount'}
                     onClick={() => setAdjMode('discount')}
                     className="chip text-[13px] font-medium py-1.5 px-3"
@@ -837,7 +874,7 @@ export function BookingRequoteWorkspace({
                   </button>
                   <button
                     type="button"
-                    disabled={isCancelled}
+                    disabled={isLocked}
                     aria-pressed={adjMode === 'surcharge'}
                     onClick={() => setAdjMode('surcharge')}
                     className="chip text-[13px] font-medium py-1.5 px-3"
@@ -860,7 +897,7 @@ export function BookingRequoteWorkspace({
                         type="number"
                         step={50_000}
                         min={0}
-                        disabled={isCancelled}
+                        disabled={isLocked}
                         value={adjAmount}
                         onChange={(e) => setAdjAmount(Math.max(0, Number(e.target.value) || 0))}
                         className="field pl-8 text-right num text-base font-semibold"
@@ -871,7 +908,7 @@ export function BookingRequoteWorkspace({
                         <button
                           key={amt}
                           type="button"
-                          disabled={isCancelled}
+                          disabled={isLocked}
                           aria-pressed={adjAmount === amt}
                           onClick={() => setAdjAmount(amt)}
                           className="chip num text-[13px] font-medium py-1 px-2.5"
@@ -959,7 +996,7 @@ export function BookingRequoteWorkspace({
                 <textarea
                   id="guide-requote-note"
                   rows={3}
-                  disabled={isCancelled}
+                  disabled={isLocked}
                   value={guideNote}
                   onChange={(e) => setGuideNote(e.target.value)}
                   placeholder="Ghi rõ lý do đổi phòng, nhà hàng hoặc chính sách ưu đãi"
@@ -967,40 +1004,74 @@ export function BookingRequoteWorkspace({
                 />
               </div>
 
-              {!isCancelled && (
+              {!isLocked && !isCompleted && (
                 <div className="space-y-3">
-                  {unpricedCustomSteps.length > 0 && (
-                    <div className="p-3 rounded-xl border border-coral bg-coral-soft text-sm text-coral font-medium">
-                      Chưa thể gửi vì còn {unpricedCustomSteps.length} yêu cầu thêm đang là 0đ. Hãy
-                      nhập giá báo khách ở các mục viền đỏ bên trái.
-                    </div>
-                  )}
-
-                  {rawTotalPreview < 0 && (
-                    <div className="p-3 rounded-xl border border-crimson bg-crimson-soft text-sm text-crimson font-medium">
-                      Tổng tiền sau giảm giá đang âm. Vui lòng giảm mức ưu đãi đoàn.
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    disabled={!canSubmitRequote}
-                    onClick={handleSendRequote}
-                    className="btn btn-primary w-full py-3.5 text-base font-medium"
-                  >
-                    {booking.status === 'BOOKED_ORIGINAL' ? (
+                  {booking.status === 'BOOKED_ORIGINAL' && !booking.guideAccepted && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={handleAcceptBooking}
+                      className="btn w-full py-3.5 text-base font-medium bg-emerald text-white border-emerald hover:brightness-110"
+                    >
                       <CheckCircleIcon size={18} strokeWidth={1.5} />
-                    ) : (
-                      <ArrowRightIcon size={18} strokeWidth={1.5} />
-                    )}
-                    <span>
-                      {busy
-                        ? 'Đang gửi báo giá'
-                        : booking.status === 'CONFIRMED'
-                        ? 'Gửi báo giá điều chỉnh cho khách'
-                        : 'Gửi báo giá lại cho khách'}
-                    </span>
-                  </button>
+                      <span>{busy ? 'Đang xác nhận...' : 'Xác nhận còn lịch'}</span>
+                    </button>
+                  )}
+
+                  {booking.status === 'CHANGE_REQUESTED' && booking.hasConfirmedSnapshot && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={handleRejectChange}
+                      className="btn btn-ghost w-full py-3 text-sm font-medium border-amber/50 text-amber hover:bg-amber-soft"
+                    >
+                      <RestoreIcon size={16} strokeWidth={1.5} />
+                      <span>Từ chối thay đổi (Giữ lịch đã chốt)</span>
+                    </button>
+                  )}
+
+                  {isConfirmed ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={handleCompleteBooking}
+                      className="btn w-full py-3.5 text-base font-medium bg-emerald text-white border-emerald hover:brightness-110"
+                    >
+                      <CheckCircleIcon size={18} strokeWidth={1.5} />
+                      <span>
+                        {busy ? 'Đang cập nhật...' : 'Xác nhận hoàn thành chuyến'}
+                      </span>
+                    </button>
+                  ) : (
+                    <>
+                      {unpricedCustomSteps.length > 0 && (
+                        <div className="p-3 rounded-xl border border-coral bg-coral-soft text-sm text-coral font-medium">
+                          Chưa thể gửi vì còn {unpricedCustomSteps.length} yêu cầu thêm đang là 0đ.
+                          Hãy nhập giá báo khách ở các mục viền đỏ bên trái.
+                        </div>
+                      )}
+
+                      {rawTotalPreview < 0 && (
+                        <div className="p-3 rounded-xl border border-crimson bg-crimson-soft text-sm text-crimson font-medium">
+                          Tổng tiền sau giảm giá đang âm. Vui lòng giảm mức ưu đãi đoàn.
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={!canSubmitRequote}
+                        onClick={handleSendRequote}
+                        className="btn btn-primary w-full py-3.5 text-base font-medium"
+                      >
+                        {booking.status === 'BOOKED_ORIGINAL' ? (
+                          <CheckCircleIcon size={18} strokeWidth={1.5} />
+                        ) : (
+                          <ArrowRightIcon size={18} strokeWidth={1.5} />
+                        )}
+                        <span>{busy ? 'Đang gửi báo giá' : 'Gửi báo giá lại cho khách'}</span>
+                      </button>
+                    </>
+                  )}
 
                   {!confirmCancelOpen ? (
                     <button
@@ -1017,6 +1088,14 @@ export function BookingRequoteWorkspace({
                       <div className="font-medium text-crimson">
                         Xác nhận hủy đơn {booking.code}? Thao tác này không thể hoàn tác.
                       </div>
+                      <textarea
+                        rows={2}
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Lý do hủy đơn (không bắt buộc)"
+                        disabled={busy}
+                        className="field text-sm bg-surface"
+                      />
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -1029,7 +1108,10 @@ export function BookingRequoteWorkspace({
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => setConfirmCancelOpen(false)}
+                          onClick={() => {
+                            setConfirmCancelOpen(false);
+                            setCancelReason('');
+                          }}
                           className="btn btn-ghost flex-1 py-2 text-sm font-medium"
                         >
                           Quay lại

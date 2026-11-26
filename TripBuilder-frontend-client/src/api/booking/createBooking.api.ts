@@ -7,6 +7,8 @@ export interface CreateBookingPayload {
   startDate: string;
   days: number;
   guests: number;
+  adults?: number;
+  children?: number;
   serviceMode: ServiceMode;
   customerNote: string;
   customized: boolean;

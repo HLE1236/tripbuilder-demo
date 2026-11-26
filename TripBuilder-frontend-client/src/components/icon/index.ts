@@ -18,6 +18,8 @@ export { ClockIcon } from './ClockIcon';
 export { CompassIcon } from './CompassIcon';
 export { CustomIcon } from './CustomIcon';
 export { EditIcon } from './EditIcon';
+export { EyeIcon } from './EyeIcon';
+export { EyeOffIcon } from './EyeOffIcon';
 export { ExternalIcon } from './ExternalIcon';
 export { FoodIcon } from './FoodIcon';
 export { HeartIcon } from './HeartIcon';

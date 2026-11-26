@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { AlertIcon, EditIcon, PlusIcon, SearchIcon, TrashIcon, XIcon } from '../../components/icon';
 import { ROLE_META } from '../../config/constants/meta';
-import { useUsersManager } from '../../hooks';
-import type { RoleFilter } from '../../stores';
+import { useAdminOverviewQuery, useUsersManager } from '../../hooks';
+import { useAdminUiStore, type RoleFilter } from '../../stores';
+import { GuideApplicationsPanel } from './GuideApplicationsPanel';
 
 const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
   { value: 'ALL', label: 'Tất cả' },
@@ -48,17 +50,33 @@ export function UsersView() {
     handleDeleteUser,
   } = useUsersManager();
 
+  const usersSubTab = useAdminUiStore((s) => s.usersSubTab);
+  const setUsersSubTab = useAdminUiStore((s) => s.setUsersSubTab);
+  const { data: overview } = useAdminOverviewQuery();
+  const pendingCount = overview?.pendingGuideApplications ?? 0;
+
   const isGuideForm = !editingUser || editingUser.role === 'GUIDE';
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeCreateModal();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [modalOpen, closeCreateModal]);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-xl font-semibold text-ink">
-            Quản lý Người dùng
+            Quản lý Người dùng &amp; Xét duyệt HDV
           </h2>
           <p className="text-sm text-ink-2 mt-0.5">
-            Tra cứu, chỉnh sửa tài khoản Khách hàng, Tour Guide và cấp tài khoản Guide mới theo vùng.
+            Tra cứu tài khoản hệ thống, cấp tài khoản Guide mới hoặc thẩm định hồ sơ đăng ký Hướng dẫn viên.
           </p>
         </div>
 
@@ -67,6 +85,48 @@ export function UsersView() {
           <span>Thêm Tour Guide mới</span>
         </button>
       </div>
+
+      {/* Sub-tab switcher */}
+      <div className="inline-flex rounded-lg border border-rule bg-surface p-1 text-xs font-medium gap-1">
+        <button
+          type="button"
+          onClick={() => setUsersSubTab('USERS')}
+          className={`px-3.5 py-2 rounded-md transition cursor-pointer ${
+            usersSubTab === 'USERS'
+              ? 'bg-coral text-white'
+              : 'text-ink-2 hover:text-ink hover:bg-surface-2'
+          }`}
+        >
+          Tài khoản hệ thống
+        </button>
+        <button
+          type="button"
+          onClick={() => setUsersSubTab('APPLICATIONS')}
+          className={`px-3.5 py-2 rounded-md transition cursor-pointer inline-flex items-center gap-2 ${
+            usersSubTab === 'APPLICATIONS'
+              ? 'bg-coral text-white'
+              : 'text-ink-2 hover:text-ink hover:bg-surface-2'
+          }`}
+        >
+          <span>Hồ sơ đăng ký HDV</span>
+          {pendingCount > 0 && (
+            <span
+              className={`num px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                usersSubTab === 'APPLICATIONS'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-amber-soft text-amber'
+              }`}
+            >
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {usersSubTab === 'APPLICATIONS' ? (
+        <GuideApplicationsPanel />
+      ) : (
+        <>
 
       {/* Filters */}
       <div className="flagship-card p-4 flex flex-wrap items-center justify-between gap-3">
@@ -199,6 +259,9 @@ export function UsersView() {
           role="dialog"
           aria-modal="true"
           aria-label={editingUser ? 'Chỉnh sửa tài khoản' : 'Thêm tài khoản Tour Guide mới'}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeCreateModal();
+          }}
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
         >
           <div className="flagship-card w-full max-w-md p-6 space-y-5 bg-surface max-h-[90vh] overflow-y-auto">
@@ -210,7 +273,7 @@ export function UsersView() {
                 <p className="text-xs text-ink-2 mt-0.5">
                   {editingUser
                     ? editingUser.email
-                    : 'Tài khoản được cấp quyền đăng nhập Cổng Tour Guide (:5174).'}
+                    : 'Tài khoản được cấp quyền đăng nhập hệ thống Tour Guide.'}
                 </p>
               </div>
               <button
@@ -300,18 +363,27 @@ export function UsersView() {
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="block text-xs font-medium text-ink-2">Vùng phụ trách</label>
+                      <label className="block text-xs font-medium text-ink-2">Vùng phụ trách *</label>
                       <select
                         value={selectedRegionId}
                         onChange={(e) => setSelectedRegionId(e.target.value)}
                         className="field"
+                        required
                       >
+                        <option value="" disabled>
+                          -- Chọn vùng phụ trách --
+                        </option>
                         {regions.map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.name} ({r.province})
                           </option>
                         ))}
                       </select>
+                      {editingUser && (
+                        <p className="text-[11px] text-ink-3">
+                          Không thể đổi vùng nếu Guide đã có tour mẫu.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <label className="block text-xs font-medium text-ink-2">Số năm kinh nghiệm</label>
@@ -358,6 +430,8 @@ export function UsersView() {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

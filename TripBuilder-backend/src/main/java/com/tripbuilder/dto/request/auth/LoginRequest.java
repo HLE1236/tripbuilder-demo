@@ -5,5 +5,6 @@ import com.tripbuilder.entity.user.Role;
 public record LoginRequest(
         String email,
         String password,
-        Role expectedRole
+        Role expectedRole,
+        Boolean rememberMe
 ) {}

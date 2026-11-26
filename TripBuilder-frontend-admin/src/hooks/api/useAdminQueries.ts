@@ -1,21 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  approveGuideApplicationApi,
   cancelAdminBookingApi,
+  completeBookingApi,
   createAdminPresetOptionApi,
   createAdminUserApi,
   deleteAdminPresetOptionApi,
   deleteAdminTourApi,
   deleteAdminUserApi,
   getAdminBookingsApi,
+  getAdminGuideApplicationsApi,
   getAdminOverviewApi,
   getAdminPresetOptionsApi,
   getAdminRegionsApi,
   getAdminToursApi,
   getAdminUsersApi,
+  reassignBookingGuideApi,
+  rejectGuideApplicationApi,
+  toggleTourStatusApi,
   updateAdminPresetOptionApi,
   updateAdminUserApi,
+  type ApproveGuideApplicationPayload,
   type CreateAdminUserPayload,
   type CreatePresetOptionPayload,
+  type GuideApplicationStatus,
+  type RejectGuideApplicationPayload,
   type UpdateAdminUserPayload,
   type UserRole,
 } from '../../api';
@@ -29,6 +38,10 @@ export const adminKeys = {
   bookings: () => [...adminKeys.all, 'bookings'] as const,
   regions: () => [...adminKeys.all, 'regions'] as const,
   presetOptions: () => [...adminKeys.all, 'preset-options'] as const,
+  guideApplications: (status?: GuideApplicationStatus | 'ALL') =>
+    status
+      ? ([...adminKeys.all, 'guide-applications', status] as const)
+      : ([...adminKeys.all, 'guide-applications'] as const),
 };
 
 export function useAdminOverviewQuery() {
@@ -143,9 +156,45 @@ export function useDeleteAdminUserMutation() {
 export function useCancelAdminBookingMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => cancelAdminBookingApi(id),
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      cancelAdminBookingApi(id, reason),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.bookings() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useReassignBookingGuideMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, guideId }: { bookingId: number; guideId: number }) =>
+      reassignBookingGuideApi(bookingId, guideId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.bookings() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useCompleteBookingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: number) => completeBookingApi(bookingId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.bookings() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useToggleTourStatusMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tourId, active }: { tourId: number; active: boolean }) =>
+      toggleTourStatusApi(tourId, active),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.tours() });
       void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
     },
   });
@@ -157,6 +206,50 @@ export function useDeleteAdminTourMutation() {
     mutationFn: (id: number) => deleteAdminTourApi(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.tours() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useAdminGuideApplicationsQuery(
+  status: GuideApplicationStatus | 'ALL' = 'ALL'
+) {
+  return useQuery({
+    queryKey: adminKeys.guideApplications(status),
+    queryFn: () => getAdminGuideApplicationsApi(status),
+  });
+}
+
+export function useApproveGuideApplicationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload?: ApproveGuideApplicationPayload;
+    }) => approveGuideApplicationApi(id, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.guideApplications() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+    },
+  });
+}
+
+export function useRejectGuideApplicationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: RejectGuideApplicationPayload;
+    }) => rejectGuideApplicationApi(id, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.guideApplications() });
       void queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
     },
   });

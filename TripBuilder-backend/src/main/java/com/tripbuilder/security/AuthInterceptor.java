@@ -27,23 +27,43 @@ public class AuthInterceptor implements HandlerInterceptor {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // Public endpoints (catalog, health, login & register)
+        // Public endpoints (catalog, health, auth flows)
         if (path.equals("/api/hello")
                 || path.startsWith("/api/system/")
                 || path.startsWith("/api/regions")
                 || path.startsWith("/api/options")
                 || path.equals("/api/auth/login")
                 || path.equals("/api/auth/register")
-                || path.equals("/api/auth/demo-accounts")) {
+                || path.equals("/api/auth/refresh")
+                || path.equals("/api/auth/logout")
+                || path.equals("/api/auth/forgot-password")
+                || path.equals("/api/auth/reset-password")
+                || path.equals("/api/auth/demo-accounts")
+                || path.equals("/api/guide-applications")
+                || path.equals("/api/guide-applications/lookup")) {
             return true;
         }
         if (path.startsWith("/api/tours") && HttpMethod.GET.matches(method)) {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && !authHeader.isBlank()) {
+                try {
+                    AppUser user = authService.authenticateHeader(authHeader);
+                    request.setAttribute(CURRENT_USER_ATTR, user);
+                } catch (Exception ignored) {
+                    // Public endpoint: ignore invalid token and treat as anonymous
+                }
+            }
             return true;
         }
 
         AppUser user = authService.authenticateHeader(request.getHeader("Authorization"));
         request.setAttribute(CURRENT_USER_ATTR, user);
         return true;
+    }
+
+    public static AppUser getOptionalCurrentUser(HttpServletRequest request) {
+        Object attr = request.getAttribute(CURRENT_USER_ATTR);
+        return (attr instanceof AppUser user) ? user : null;
     }
 
     public static AppUser requireCurrentUser(HttpServletRequest request) {

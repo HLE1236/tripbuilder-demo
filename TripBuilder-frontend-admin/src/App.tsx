@@ -7,9 +7,8 @@ import {
   SunIcon,
   type IconName,
 } from './components/icon';
-import { PORTAL_LINKS } from './config/constants/meta';
 import { tripBuilderAdminTheme } from './config/theme';
-import { useAdminPortal } from './hooks';
+import { useAdminOverviewQuery, useAdminPortal } from './hooks';
 import type { AdminTab } from './stores';
 import { CatalogView } from './views/admin/CatalogView';
 import { OperationsView } from './views/admin/OperationsView';
@@ -21,7 +20,7 @@ const NAV_ITEMS: { id: AdminTab; label: string; desc: string; icon: IconName }[]
   { id: 'overview', label: 'Tổng quan KPI', desc: 'Doanh thu & đơn toàn sàn', icon: 'dashboard' },
   { id: 'users', label: 'Người dùng', desc: 'Khách, Guide & cấp mới', icon: 'users' },
   { id: 'operations', label: 'Tour & Đơn đặt', desc: 'Giám sát lịch trình', icon: 'clipboard' },
-  { id: 'catalog', label: 'Vùng & Kho dịch vụ', desc: 'PresetOption 6 vùng', icon: 'layers' },
+  { id: 'catalog', label: 'Vùng & Kho dịch vụ', desc: 'Kho dịch vụ vùng', icon: 'layers' },
 ];
 
 export function App() {
@@ -35,6 +34,8 @@ export function App() {
     handleLoginSuccess,
     handleLogout,
   } = useAdminPortal();
+  const { data: overview } = useAdminOverviewQuery();
+  const pendingApplications = overview?.pendingGuideApplications ?? 0;
 
   if (bootstrapping) {
     return (
@@ -89,8 +90,15 @@ export function App() {
                     }`}
                   >
                     <Icon name={item.icon} size={17} className="shrink-0" />
-                    <div className="min-w-0">
-                      <div className="text-sm leading-tight">{item.label}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm leading-tight">{item.label}</span>
+                        {item.id === 'users' && pendingApplications > 0 && (
+                          <span className="num px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-soft text-amber">
+                            {pendingApplications}
+                          </span>
+                        )}
+                      </div>
                       <div className="hidden lg:block text-xs text-ink-3 truncate mt-0.5">
                         {item.desc}
                       </div>
@@ -99,29 +107,6 @@ export function App() {
                 );
               })}
             </nav>
-          </div>
-
-          {/* Portal Links (Desktop) */}
-          <div className="hidden lg:block p-4 border-t border-rule space-y-2">
-            <div className="text-xs font-medium text-ink-3 px-1">Cổng liên kết nhanh</div>
-            <a
-              href={PORTAL_LINKS.client}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-ink-2 hover:bg-surface-2 hover:text-ink transition"
-            >
-              <span>Cổng Khách hàng</span>
-              <span className="num text-ink-3">:5173</span>
-            </a>
-            <a
-              href={PORTAL_LINKS.guide}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-ink-2 hover:bg-surface-2 hover:text-ink transition"
-            >
-              <span>Cổng Tour Guide</span>
-              <span className="num text-ink-3">:5174</span>
-            </a>
           </div>
         </aside>
 

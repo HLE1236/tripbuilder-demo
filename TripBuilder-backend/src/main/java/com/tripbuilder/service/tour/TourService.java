@@ -5,11 +5,14 @@ import com.tripbuilder.entity.tour.TourStep;
 import com.tripbuilder.repository.TourRepository;
 
 import com.tripbuilder.dto.request.tour.SaveTourRequest;
+import com.tripbuilder.dto.request.tour.TourStatusRequest;
 import com.tripbuilder.dto.request.tour.TourStepRequest;
 import com.tripbuilder.dto.response.region.PhotoItemDto;
 import com.tripbuilder.dto.response.tour.TourDto;
+import com.tripbuilder.dto.response.tour.TourReviewDto;
 import com.tripbuilder.dto.response.tour.TourStepDto;
 import com.tripbuilder.dto.response.user.UserDto;
+import com.tripbuilder.entity.booking.Booking;
 import com.tripbuilder.entity.region.Region;
 import com.tripbuilder.entity.region.RegionPhoto;
 import com.tripbuilder.entity.user.AppUser;
@@ -53,7 +56,7 @@ public class TourService {
 
     @Transactional(readOnly = true)
     public List<TourDto> list(Long guideId) {
-        return list(guideId, null, null, null, null, null);
+        return list(guideId, null, null, null, null, null, false, null);
     }
 
     @Transactional(readOnly = true)
@@ -63,13 +66,34 @@ public class TourService {
                               Integer maxDays,
                               String q,
                               String sort) {
+        return list(guideId, regionId, minDays, maxDays, q, sort, false, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TourDto> list(Long guideId,
+                              Long regionId,
+                              Integer minDays,
+                              Integer maxDays,
+                              String q,
+                              String sort,
+                              boolean includeInactive,
+                              AppUser actingUser) {
         List<Tour> base = guideId == null
                 ? tourRepository.findAllByOrderByIdDesc()
                 : tourRepository.findByGuideIdOrderByIdDesc(guideId);
 
         String keyword = (q != null && !q.isBlank()) ? q.trim().toLowerCase(Locale.ROOT) : null;
+        boolean isAdmin = actingUser != null && actingUser.getRole() == Role.ADMIN;
+        Long actingGuideId = (actingUser != null && actingUser.getRole() == Role.GUIDE) ? actingUser.getId() : null;
 
         List<Tour> filtered = new ArrayList<>(base.stream()
+                .filter(t -> {
+                    boolean isActive = !Boolean.FALSE.equals(t.getActive());
+                    if (isActive) return true;
+                    if (!includeInactive) return false;
+                    if (isAdmin) return true;
+                    return actingGuideId != null && t.getGuide() != null && actingGuideId.equals(t.getGuide().getId());
+                })
                 .filter(t -> regionId == null || (t.getRegion() != null && Objects.equals(t.getRegion().getId(), regionId)))
                 .filter(t -> minDays == null || (t.getDays() != null && t.getDays() >= minDays))
                 .filter(t -> maxDays == null || (t.getDays() != null && t.getDays() <= maxDays))
@@ -82,7 +106,8 @@ public class TourService {
         }
 
         Map<String, RegionPhoto> photoMap = loadPhotoMap();
-        return filtered.stream().map(t -> toDto(t, photoMap)).toList();
+        Map<Long, List<TourReviewDto>> reviewMap = loadReviewMap();
+        return filtered.stream().map(t -> toDto(t, photoMap, reviewMap.getOrDefault(t.getId(), List.of()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -98,14 +123,17 @@ public class TourService {
         AppUser guide = userRepository.findById(req.guideId() == null ? -1 : req.guideId())
                 .filter(u -> u.getRole() == Role.GUIDE)
                 .orElseThrow(() -> new BadRequestException("Tài khoản Tour Guide không hợp lệ"));
-        Region region = regionRepository.findById(req.regionId() == null ? -1 : req.regionId())
-                .orElseThrow(() -> new BadRequestException("Vui lòng chọn khu vực điểm đến"));
+        if (guide.getRegion() == null) {
+            throw new BadRequestException("Tài khoản Guide chưa được gán vùng phụ trách. Vui lòng liên hệ Admin.");
+        }
+        Region region = guide.getRegion();
 
         LocalDateTime now = LocalDateTime.now();
         Tour tour = Tour.builder()
                 .guide(guide)
                 .region(region)
                 .version(1)
+                .active(true)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -122,13 +150,34 @@ public class TourService {
         if (actingGuide != null && !tour.getGuide().getId().equals(actingGuide.getId())) {
             throw new ForbiddenException("Bạn chỉ có thể chỉnh sửa tour do chính mình đăng");
         }
-        Region region = req.regionId() != null
-                ? regionRepository.findById(req.regionId()).orElse(tour.getRegion())
-                : tour.getRegion();
+        AppUser ownerGuide = tour.getGuide();
+        if (ownerGuide.getRegion() == null) {
+            throw new BadRequestException("Tài khoản Guide chưa được gán vùng phụ trách. Vui lòng liên hệ Admin.");
+        }
+        Region region = ownerGuide.getRegion();
+        if (!Objects.equals(region.getId(), tour.getRegion().getId()) && bookingRepository.existsByTourId(id)) {
+            throw new BadRequestException("Không thể thay đổi khu vực của tour đã có đơn đặt");
+        }
         tour.setRegion(region);
         tour.setVersion((tour.getVersion() == null ? 1 : tour.getVersion()) + 1);
         tour.setUpdatedAt(LocalDateTime.now());
         applyFields(tour, region, req);
+        tourRepository.flush();
+        return toDto(tour);
+    }
+
+    @Transactional
+    public TourDto updateStatus(Long id, TourStatusRequest req, AppUser actingUser) {
+        if (req == null || req.active() == null) {
+            throw new BadRequestException("Trạng thái tour không hợp lệ");
+        }
+        Tour tour = find(id);
+        if (actingUser != null && actingUser.getRole() != Role.ADMIN
+                && !tour.getGuide().getId().equals(actingUser.getId())) {
+            throw new ForbiddenException("Bạn chỉ có thể thay đổi trạng thái tour do chính mình đăng");
+        }
+        tour.setActive(req.active());
+        tour.setUpdatedAt(LocalDateTime.now());
         tourRepository.flush();
         return toDto(tour);
     }
@@ -262,7 +311,32 @@ public class TourService {
     }
 
     public TourDto toDto(Tour t) {
-        return toDto(t, loadPhotoMap());
+        List<TourReviewDto> reviews = bookingRepository.findByTourIdAndCustomerRatingIsNotNullOrderByUpdatedAtDesc(t.getId())
+                .stream()
+                .map(TourService::toReviewDto)
+                .toList();
+        return toDto(t, loadPhotoMap(), reviews);
+    }
+
+    private Map<Long, List<TourReviewDto>> loadReviewMap() {
+        Map<Long, List<TourReviewDto>> map = new LinkedHashMap<>();
+        for (Booking b : bookingRepository.findByCustomerRatingIsNotNullOrderByUpdatedAtDesc()) {
+            if (b.getTour() != null && b.getTour().getId() != null) {
+                map.computeIfAbsent(b.getTour().getId(), k -> new ArrayList<>())
+                        .add(toReviewDto(b));
+            }
+        }
+        return map;
+    }
+
+    private static TourReviewDto toReviewDto(Booking b) {
+        return new TourReviewDto(
+                b.getCode(),
+                b.getCustomer() != null ? b.getCustomer().getFullName() : "Khách hàng",
+                b.getCustomerRating(),
+                b.getCustomerReview(),
+                b.getUpdatedAt()
+        );
     }
 
     private Map<String, RegionPhoto> loadPhotoMap() {
@@ -275,7 +349,7 @@ public class TourService {
         return map;
     }
 
-    private TourDto toDto(Tour t, Map<String, RegionPhoto> photoMap) {
+    private TourDto toDto(Tour t, Map<String, RegionPhoto> photoMap, List<TourReviewDto> reviews) {
         String cover = t.getImageUrl() != null && !t.getImageUrl().isBlank()
                 ? t.getImageUrl()
                 : t.getRegion().getImageUrl();
@@ -299,6 +373,11 @@ public class TourService {
             return new PhotoItemDto(null, url, t.getTitle(), fallbackCaption, "Ảnh tour", null);
         }).toList();
 
+        List<TourReviewDto> safeReviews = reviews != null ? reviews : List.of();
+        int reviewCount = safeReviews.size();
+        Double averageRating = reviewCount == 0 ? null
+                : Math.round(safeReviews.stream().mapToInt(TourReviewDto::rating).average().orElse(0.0) * 10.0) / 10.0;
+
         return new TourDto(
                 t.getId(),
                 t.getTitle(),
@@ -309,6 +388,10 @@ public class TourService {
                 t.getDays(),
                 t.getBasePricePerPerson(),
                 t.getVersion() == null ? 1 : t.getVersion(),
+                !Boolean.FALSE.equals(t.getActive()),
+                averageRating,
+                reviewCount,
+                safeReviews,
                 t.getRegion().getId(),
                 t.getRegion().getName(),
                 t.getRegion().getProvince(),

@@ -6,3 +6,5 @@ export * from './tour';
 export * from './booking';
 export * from './region';
 export * from './option';
+export * from './notification';
+export * from './guide-application';

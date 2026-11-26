@@ -1,11 +1,5 @@
 import type { BookingStatus, ServiceMode } from '@/api/types';
 
-export const CLIENT_PORT_URL =
-  import.meta.env.VITE_CLIENT_PORT_URL || 'http://localhost:5173';
-
-export const ADMIN_PORT_URL =
-  import.meta.env.VITE_ADMIN_PORT_URL || 'http://localhost:5175';
-
 export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'error';
 
 export function serviceModeMeta(mode?: string | null): {
@@ -71,6 +65,15 @@ export function statusMeta(status: BookingStatus): {
         stampClass: 'stamp-green',
         short: 'Đã xác nhận · Đã chốt',
         hint: 'Sẵn sàng khởi hành',
+        actionNeeded: false,
+      };
+    case 'COMPLETED':
+      return {
+        tone: 'success',
+        tagClass: 'tag-forest',
+        stampClass: 'stamp-green',
+        short: 'Đã hoàn thành',
+        hint: 'Chuyến đi đã hoàn tất',
         actionNeeded: false,
       };
     case 'CANCELLED':

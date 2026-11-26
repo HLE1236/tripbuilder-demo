@@ -4,3 +4,4 @@ export * from './useBookingQueries';
 export * from './useFavoriteQueries';
 export * from './useRegionQueries';
 export * from './useOptionQueries';
+export * from './useNotificationQueries';

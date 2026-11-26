@@ -1,17 +1,18 @@
 import { useState, type FormEvent } from 'react';
-import type { User } from '@/api/types';
-import { useDemoAccountsQuery, useLoginMutation } from '@/hooks/api';
+import type { AuthResponse } from '@/api/types';
+import { useLoginMutation } from '@/hooks/api';
 
 interface UseLoginFormOptions {
-  onSuccess: (token: string, user: User) => void;
+  onSuccess: (auth: AuthResponse, rememberMe: boolean) => void;
 }
 
 export function useLoginForm({ onSuccess }: UseLoginFormOptions) {
   const [email, setEmail] = useState('binh.guide@tripbuilder.vn');
   const [password, setPassword] = useState('123456');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const { data: demos = [] } = useDemoAccountsQuery();
   const loginMutation = useLoginMutation();
 
   const submitLogin = async (targetEmail: string, targetPassword: string) => {
@@ -20,8 +21,9 @@ export function useLoginForm({ onSuccess }: UseLoginFormOptions) {
       const data = await loginMutation.mutateAsync({
         email: targetEmail.trim(),
         password: targetPassword,
+        rememberMe,
       });
-      onSuccess(data.token, data.user);
+      onSuccess(data, rememberMe);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
     }
@@ -32,21 +34,17 @@ export function useLoginForm({ onSuccess }: UseLoginFormOptions) {
     void submitLogin(email, password);
   };
 
-  const handleDemoLogin = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('123456');
-    void submitLogin(demoEmail, '123456');
-  };
-
   return {
     email,
     setEmail,
     password,
     setPassword,
-    demos,
+    rememberMe,
+    setRememberMe,
+    showPassword,
+    setShowPassword,
     loading: loginMutation.isPending,
     error,
     handleSubmit,
-    handleDemoLogin,
   };
 }
