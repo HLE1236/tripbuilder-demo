@@ -21,7 +21,8 @@ Project1_demo/
 ├── TripBuilder-frontend-guide/    # React + Vite (:5174)
 ├── TripBuilder-frontend-admin/    # React + Vite (:5175)
 ├── PLAN_RESTRUCTURE.md            # Kế hoạch tái cấu trúc & phân công Subagents
-└── run-all.bat                    # Script khởi chạy đồng bộ 4 service trên Windows
+├── run-all.bat                    # Script khởi chạy đồng bộ 4 service trên Windows
+└── run-all.sh                     # Script khởi chạy đồng bộ 4 service trên macOS / Linux
 ```
 
 ## Dữ liệu mẫu & Tài khoản demo (Mật khẩu chung: `123456`)
@@ -39,17 +40,29 @@ Dừng Backend (`:8080`), sau đó xoá thư mục `TripBuilder-backend/data` v�
 Remove-Item -Recurse -Force d:\2026.1\Project1_demo\TripBuilder-backend\data
 ```
 
-## Khởi chạy nhanh (Windows)
+## Khởi chạy nhanh
 
+**Windows:**
 ```bat
 run-all.bat
+```
+
+**macOS / Linux:**
+```bash
+chmod +x run-all.sh && ./run-all.sh
 ```
 
 Hoặc chạy từng terminal riêng lẻ:
 
 ```powershell
+# Windows
 cd TripBuilder-backend; .\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=h2
 cd TripBuilder-frontend-client; npm run dev
 cd TripBuilder-frontend-guide; npm run dev
 cd TripBuilder-frontend-admin; npm run dev
+```
+
+```bash
+# macOS / Linux
+cd TripBuilder-backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=h2
 ```
