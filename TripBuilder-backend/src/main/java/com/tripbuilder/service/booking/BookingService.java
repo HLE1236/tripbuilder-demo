@@ -63,7 +63,11 @@ public class BookingService {
     @Transactional(readOnly = true)
     public List<BookingDto> list(Long customerId, Long guideId) {
         List<Booking> list;
-        if (customerId != null) {
+        if (customerId != null && guideId != null) {
+            list = bookingRepository.findByCustomerIdOrderByUpdatedAtDesc(customerId).stream()
+                    .filter(b -> b.getGuide() != null && guideId.equals(b.getGuide().getId()))
+                    .toList();
+        } else if (customerId != null) {
             list = bookingRepository.findByCustomerIdOrderByUpdatedAtDesc(customerId);
         } else if (guideId != null) {
             list = bookingRepository.findByGuideIdOrderByUpdatedAtDesc(guideId);
@@ -88,6 +92,9 @@ public class BookingService {
             throw new BadRequestException("Dữ liệu đặt tour không hợp lệ");
         }
         Tour tour = tourService.find(req.tourId() == null ? -1 : req.tourId());
+        if (Boolean.FALSE.equals(tour.getActive())) {
+            throw new BadRequestException("Tour mẫu này hiện đang tạm ẩn và không nhận đặt chỗ");
+        }
         AppUser customer = userRepository.findById(req.customerId() == null ? -1 : req.customerId())
                 .filter(u -> u.getRole() == Role.CUSTOMER)
                 .orElseThrow(() -> new BadRequestException("Tài khoản khách hàng không hợp lệ"));
@@ -302,6 +309,9 @@ public class BookingService {
         if (b.getStatus() != BookingStatus.COMPLETED) {
             throw new BadRequestException("Chỉ có thể đánh giá sau khi chuyến đi đã hoàn thành");
         }
+        if (b.getCustomerRating() != null) {
+            throw new BadRequestException("Bạn đã đánh giá chuyến đi này rồi");
+        }
         if (req == null || req.rating() < 1 || req.rating() > 5) {
             throw new BadRequestException("Số sao đánh giá phải từ 1 đến 5");
         }
@@ -320,7 +330,9 @@ public class BookingService {
         if (actingGuide != null && !b.getGuide().getId().equals(actingGuide.getId())) {
             throw new ForbiddenException("Bạn chỉ có thể xác nhận đơn thuộc tour của mình");
         }
-        if (b.getStatus() == BookingStatus.CANCELLED || b.getStatus() == BookingStatus.COMPLETED) {
+        if (b.getStatus() != BookingStatus.BOOKED_ORIGINAL
+                && b.getStatus() != BookingStatus.WAITING_REQUOTE
+                && b.getStatus() != BookingStatus.CHANGE_REQUESTED) {
             throw new BadRequestException("Đơn ở trạng thái hiện tại không thể xác nhận lịch trống");
         }
         ensureNoCompanionOverlap(b.getGuide().getId(), b.getStartDate(), b.getDays(), b.getId(), b.getServiceMode());
@@ -1007,8 +1019,11 @@ public class BookingService {
 
     private static int[] resolveGuestCounts(Integer reqGuests, Integer reqAdults, Integer reqChildren, int fallbackGuests) {
         if (reqAdults != null || reqChildren != null) {
+            if (reqChildren != null && reqChildren < 0) {
+                throw new BadRequestException("Số trẻ em không được nhỏ hơn 0");
+            }
             int adults = reqAdults != null ? Math.max(0, reqAdults) : 0;
-            int children = reqChildren != null ? Math.max(0, reqChildren) : 0;
+            int children = reqChildren != null ? reqChildren : 0;
             if (adults < 1) {
                 throw new BadRequestException("Phải có ít nhất 1 người lớn tham gia chuyến đi");
             }

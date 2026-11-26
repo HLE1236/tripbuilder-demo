@@ -4,6 +4,7 @@ import com.tripbuilder.entity.favorite.SavedTour;
 import com.tripbuilder.repository.SavedTourRepository;
 
 import com.tripbuilder.entity.tour.Tour;
+import com.tripbuilder.exception.BadRequestException;
 import com.tripbuilder.service.tour.TourService;
 import com.tripbuilder.entity.user.AppUser;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,14 @@ public class FavoriteService {
                 .toList();
     }
 
-    @Transactional
     public List<Long> save(AppUser customer, Long tourId) {
         Tour tour = tourService.find(tourId);
+        if (Boolean.FALSE.equals(tour.getActive())) {
+            throw new BadRequestException("Tour đã ngừng hoạt động, không thể lưu");
+        }
         if (!savedTourRepository.existsByCustomerIdAndTourId(customer.getId(), tour.getId())) {
             try {
-                savedTourRepository.save(SavedTour.builder()
+                savedTourRepository.saveAndFlush(SavedTour.builder()
                         .customer(customer)
                         .tour(tour)
                         .createdAt(LocalDateTime.now())

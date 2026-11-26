@@ -168,11 +168,17 @@ class AuthSecurityAndSearchTests {
                         .content("{\"refreshToken\":\"" + rememberAuth.refreshToken() + "\"}"))
                 .andExpect(status().isUnauthorized());
 
-        // Logout revokes the new refresh token
+        // Logout revokes both the refresh token and the active access token
+        var logoutLogin = authService.login(new LoginRequest("an.nguyen@gmail.com", "123456", Role.CUSTOMER, false));
         mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + logoutLogin.token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"" + newRefreshToken + "\"}"))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + logoutLogin.token()))
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -281,14 +287,100 @@ class AuthSecurityAndSearchTests {
                         .content("{\"currentPassword\":\"WrongPass123\",\"newPassword\":\"ChangedPass123\",\"confirmPassword\":\"ChangedPass123\"}"))
                 .andExpect(status().isBadRequest());
 
-        // Change password valid -> 200
+        // Change password valid -> 200 and old access token is immediately revoked
         mockMvc.perform(post("/api/auth/change-password")
                         .header("Authorization", "Bearer " + auth.token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currentPassword\":\"InitPass123\",\"newPassword\":\"ChangedPass123\",\"confirmPassword\":\"ChangedPass123\"}"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + auth.token()))
+                .andExpect(status().isUnauthorized());
+
         assertNotNull(authService.login(new LoginRequest("profile.user@gmail.com", "ChangedPass123", Role.CUSTOMER, false)).token());
+    }
+
+    @Test
+    void unknownRouteReturns404AndDeleteUserCleansUpForeignKeys() throws Exception {
+        var adminAuth = authService.login(new LoginRequest("admin@tripbuilder.vn", "123456", Role.ADMIN, false));
+
+        mockMvc.perform(get("/api/nonexistent-endpoint")
+                        .header("Authorization", "Bearer " + adminAuth.token()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.statusCode").value(404));
+
+        // Admin createUser rejects weak password and invalid phone
+        mockMvc.perform(post("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminAuth.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Weak User\",\"email\":\"weak@gmail.com\",\"password\":\"123456\",\"phone\":\"0901234567\",\"role\":\"CUSTOMER\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminAuth.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Bad Phone\",\"email\":\"badphone@gmail.com\",\"password\":\"StrongPass123\",\"phone\":\"123\",\"role\":\"CUSTOMER\"}"))
+                .andExpect(status().isBadRequest());
+
+        // Create user, log them in (creates refresh_token), then delete via admin API -> 200
+        MvcResult createdRes = mockMvc.perform(post("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminAuth.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Temp User\",\"email\":\"temp.del@gmail.com\",\"password\":\"StrongPass123\",\"phone\":\"0901234567\",\"role\":\"CUSTOMER\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        long tempUserId = objectMapper.readTree(createdRes.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+
+        authService.login(new LoginRequest("temp.del@gmail.com", "StrongPass123", Role.CUSTOMER, false));
+
+        mockMvc.perform(delete("/api/admin/users/" + tempUserId)
+                        .header("Authorization", "Bearer " + adminAuth.token()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void inactiveTourCannotBeViewedPubliclyOrBooked() throws Exception {
+        var guideAuth = authService.login(new LoginRequest("binh.guide@tripbuilder.vn", "123456", Role.GUIDE, false));
+        var customerAuth = authService.login(new LoginRequest("an.nguyen@gmail.com", "123456", Role.CUSTOMER, false));
+
+        // Find a tour owned by binh.guide (id=1 in seed)
+        MvcResult listRes = mockMvc.perform(get("/api/tours").param("guideId", String.valueOf(guideAuth.user().id())))
+                .andExpect(status().isOk())
+                .andReturn();
+        long tourId = objectMapper.readTree(listRes.getResponse().getContentAsString())
+                .get("data").get(0).get("id").asLong();
+
+        try {
+            mockMvc.perform(patch("/api/tours/" + tourId + "/status")
+                            .header("Authorization", "Bearer " + guideAuth.token())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"active\":false}"))
+                    .andExpect(status().isOk());
+
+            // Public GET /api/tours/{id} and customer booking must be rejected
+            mockMvc.perform(get("/api/tours/" + tourId))
+                    .andExpect(status().isBadRequest());
+
+            mockMvc.perform(post("/api/bookings")
+                            .header("Authorization", "Bearer " + customerAuth.token())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"tourId\":" + tourId + ",\"days\":2,\"guests\":2}"))
+                    .andExpect(status().isBadRequest());
+
+            // Owner guide can still view their inactive tour
+            mockMvc.perform(get("/api/tours/" + tourId)
+                            .header("Authorization", "Bearer " + guideAuth.token()))
+                    .andExpect(status().isOk());
+        } finally {
+            // Restore active=true so other tests/data remain clean
+            mockMvc.perform(patch("/api/tours/" + tourId + "/status")
+                            .header("Authorization", "Bearer " + guideAuth.token())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"active\":true}"))
+                    .andExpect(status().isOk());
+        }
     }
 
     @Test

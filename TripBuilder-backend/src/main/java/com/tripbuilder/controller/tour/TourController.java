@@ -37,8 +37,8 @@ public class TourController {
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<TourDto> get(@PathVariable Long id) {
-        return ApiResponse.ok(tourService.get(id));
+    public ApiResponse<TourDto> get(@PathVariable Long id, HttpServletRequest request) {
+        return ApiResponse.ok(tourService.get(id, AuthInterceptor.getOptionalCurrentUser(request)));
     }
 
     /** Chỉ Tour Guide được đăng Tour Preset mới. */

@@ -39,8 +39,8 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@RequestBody(required = false) LogoutRequest req) {
-        authService.logout(req);
+    public ApiResponse<Void> logout(@RequestBody(required = false) LogoutRequest req, HttpServletRequest request) {
+        authService.logout(req, request.getHeader("Authorization"));
         return ApiResponse.ok("Đăng xuất thành công", null);
     }
 

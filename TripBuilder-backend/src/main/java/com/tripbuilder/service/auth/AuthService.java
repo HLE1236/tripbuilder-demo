@@ -17,9 +17,11 @@ import com.tripbuilder.repository.GuideApplicationRepository;
 import com.tripbuilder.repository.PasswordResetOtpRepository;
 import com.tripbuilder.repository.RefreshTokenRepository;
 import com.tripbuilder.repository.UserRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -53,13 +56,38 @@ public class AuthService {
     private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+    private static final String DEV_FALLBACK_SECRET = "tripbuilder-local-dev-secret-2026-hmac-key";
+
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordResetOtpRepository passwordResetOtpRepository;
     private final GuideApplicationRepository guideApplicationRepository;
+    private final Environment environment;
 
-    @Value("${app.auth.secret:tripbuilder-local-dev-secret-2026-hmac-key}")
+    @Value("${app.auth.secret:}")
     private String authSecret;
+
+    @Value("${app.auth.expose-dev-otp:false}")
+    private boolean exposeDevOtp;
+
+    @PostConstruct
+    void validateAuthConfig() {
+        if (authSecret == null || authSecret.isBlank() || authSecret.length() < 32) {
+            throw new IllegalStateException(
+                    "app.auth.secret must be configured with at least 32 characters (set APP_AUTH_SECRET)");
+        }
+        if (!isDevOrTestProfile() && DEV_FALLBACK_SECRET.equals(authSecret)) {
+            throw new IllegalStateException(
+                    "Default dev auth secret is not allowed outside h2/dev/test profiles");
+        }
+    }
+
+    private boolean isDevOrTestProfile() {
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(p -> p.equalsIgnoreCase("h2")
+                        || p.equalsIgnoreCase("dev")
+                        || p.equalsIgnoreCase("test"));
+    }
 
     @Transactional
     public AuthResponse login(LoginRequest req) {
@@ -168,16 +196,31 @@ public class AuthService {
 
     @Transactional
     public void logout(LogoutRequest req) {
-        if (req == null || req.refreshToken() == null || req.refreshToken().isBlank()) {
-            return;
+        logout(req, null);
+    }
+
+    @Transactional
+    public void logout(LogoutRequest req, String authHeader) {
+        if (req != null && req.refreshToken() != null && !req.refreshToken().isBlank()) {
+            String tokenHash = sha256Hex(req.refreshToken().trim());
+            refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(rt -> {
+                if (!rt.isRevoked()) {
+                    rt.setRevoked(true);
+                    refreshTokenRepository.save(rt);
+                }
+                bumpTokenVersion(rt.getUser());
+                refreshTokenRepository.revokeAllByUserId(rt.getUser().getId());
+            });
         }
-        String tokenHash = sha256Hex(req.refreshToken().trim());
-        refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(rt -> {
-            if (!rt.isRevoked()) {
-                rt.setRevoked(true);
-                refreshTokenRepository.save(rt);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                AppUser user = authenticateHeader(authHeader);
+                bumpTokenVersion(user);
+                refreshTokenRepository.revokeAllByUserId(user.getId());
+            } catch (UnauthorizedException ignored) {
+                // Token already invalid/expired; nothing left to revoke
             }
-        });
+        }
     }
 
     @Transactional
@@ -208,11 +251,11 @@ public class AuthService {
                 .createdAt(now)
                 .build());
 
-        log.info("Password reset OTP for {}: {}", email, otp);
+        String responseDevOtp = (exposeDevOtp && isDevOrTestProfile()) ? otp : null;
 
         return new ForgotPasswordResponse(
-                "Mã xác nhận đã được gửi đến email của bạn.",
-                otp
+                "Nếu email tồn tại trong hệ thống, mã xác nhận đã được gửi.",
+                responseDevOtp
         );
     }
 
@@ -256,6 +299,7 @@ public class AuthService {
         otpRecord.setUsed(true);
         passwordResetOtpRepository.save(otpRecord);
 
+        bumpTokenVersion(user);
         refreshTokenRepository.revokeAllByUserId(user.getId());
     }
 
@@ -272,6 +316,10 @@ public class AuthService {
             String avatarUrl = req.avatarUrl().trim();
             if (avatarUrl.length() > 500) {
                 throw new BadRequestException("Đường dẫn ảnh đại diện không được vượt quá 500 ký tự");
+            }
+            String lower = avatarUrl.toLowerCase(java.util.Locale.ROOT);
+            if (!(avatarUrl.startsWith("/") || lower.startsWith("http://") || lower.startsWith("https://"))) {
+                throw new BadRequestException("Đường dẫn ảnh đại diện phải bắt đầu bằng /, http:// hoặc https://");
             }
             currentUser.setAvatarUrl(avatarUrl);
         }
@@ -295,8 +343,13 @@ public class AuthService {
 
         validateStrongPassword(req.newPassword(), req.confirmPassword());
 
+        if (req.newPassword().equals(req.currentPassword())) {
+            throw new BadRequestException("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
+
         currentUser.setPasswordHash(hashPassword(req.newPassword()));
-        userRepository.save(currentUser);
+        bumpTokenVersion(currentUser);
+        refreshTokenRepository.revokeAllByUserId(currentUser.getId());
     }
 
     public static boolean isValidEmail(String email) {
@@ -345,14 +398,16 @@ public class AuthService {
             throw new UnauthorizedException("Token đăng nhập không hợp lệ");
         }
         String[] fields = payload.split(":");
-        if (fields.length < 3) {
+        if (fields.length < 4) {
             throw new UnauthorizedException("Dữ liệu phiên đăng nhập bị lỗi");
         }
         long userId;
         long exp;
+        long tokenVersion;
         try {
             userId = Long.parseLong(fields[0]);
             exp = Long.parseLong(fields[2]);
+            tokenVersion = Long.parseLong(fields[3]);
         } catch (NumberFormatException ex) {
             throw new UnauthorizedException("Phiên đăng nhập không hợp lệ");
         }
@@ -365,6 +420,10 @@ public class AuthService {
                 .orElseThrow(() -> new UnauthorizedException("Tài khoản không còn tồn tại"));
         if (!user.getRole().name().equals(fields[1])) {
             throw new UnauthorizedException("Quyền tài khoản không khớp phiên đăng nhập");
+        }
+        long currentVersion = user.getTokenVersion() != null ? user.getTokenVersion() : 0L;
+        if (tokenVersion != currentVersion) {
+            throw new UnauthorizedException("Phiên đăng nhập đã bị thu hồi, vui lòng đăng nhập lại");
         }
         return user;
     }
@@ -437,7 +496,7 @@ public class AuthService {
         return phone;
     }
 
-    public static void validateStrongPassword(String password, String confirmPassword) {
+    public static void validateStrongPassword(String password) {
         if (password == null || password.length() < 8 || password.length() > 100) {
             throw new BadRequestException("Mật khẩu phải có từ 8 đến 100 ký tự");
         }
@@ -453,6 +512,10 @@ public class AuthService {
         if (!hasUpper || !hasLower || !hasDigit) {
             throw new BadRequestException("Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số");
         }
+    }
+
+    public static void validateStrongPassword(String password, String confirmPassword) {
+        validateStrongPassword(password);
         if (!password.equals(confirmPassword)) {
             throw new BadRequestException("Mật khẩu xác nhận không khớp");
         }
@@ -484,9 +547,16 @@ public class AuthService {
         return rawRefreshToken;
     }
 
+    private void bumpTokenVersion(AppUser user) {
+        long current = user.getTokenVersion() != null ? user.getTokenVersion() : 0L;
+        user.setTokenVersion(current + 1L);
+        userRepository.save(user);
+    }
+
     private String issueToken(AppUser user) {
         long exp = Instant.now().getEpochSecond() + ACCESS_TOKEN_TTL_SECONDS;
-        String payload = user.getId() + ":" + user.getRole().name() + ":" + exp;
+        long ver = user.getTokenVersion() != null ? user.getTokenVersion() : 0L;
+        String payload = user.getId() + ":" + user.getRole().name() + ":" + exp + ":" + ver;
         String payloadB64 = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
         String sig = sign(payloadB64);

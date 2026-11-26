@@ -213,8 +213,9 @@ public class GuideApplicationService {
 
     private String generateUniqueCode() {
         for (int attempt = 0; attempt < 20; attempt++) {
-            StringBuilder suffix = new StringBuilder(4);
-            for (int i = 0; i < 4; i++) {
+            int len = attempt < 10 ? 4 : 6;
+            StringBuilder suffix = new StringBuilder(len);
+            for (int i = 0; i < len; i++) {
                 suffix.append(CODE_CHARS.charAt(SECURE_RANDOM.nextInt(CODE_CHARS.length())));
             }
             String candidate = "GA-2026-" + suffix;
@@ -222,7 +223,7 @@ public class GuideApplicationService {
                 return candidate;
             }
         }
-        return "GA-2026-" + (System.currentTimeMillis() % 100000);
+        throw new IllegalStateException("Không thể sinh mã hồ sơ duy nhất");
     }
 
     private static String trimOptional(String value, int maxLen, String errorMsg) {

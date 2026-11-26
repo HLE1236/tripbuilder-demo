@@ -931,7 +931,7 @@ class AuthAndFlowTests {
         // Same-region reassign (create second Hạ Long guide) succeeds -> 200
         String uniqueHaLongEmail = "halong.backup." + System.nanoTime() + "@tripbuilder.vn";
         Long sameRegionGuideId = adminService.createUser(new CreateUserRequest(
-                "Backup Hạ Long", uniqueHaLongEmail, "123456", "0909111222",
+                "Backup Hạ Long", uniqueHaLongEmail, "BackupPass123", "0909111222",
                 Role.GUIDE, 1L, "Guide Hạ Long", 4, null
         )).id();
 

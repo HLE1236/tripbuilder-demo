@@ -43,10 +43,10 @@ public class PresetOptionService {
         }
 
         if ("price_asc".equalsIgnoreCase(sort)) {
-            stream = stream.sorted(Comparator.comparingLong(PresetOption::getPricePerPerson)
+            stream = stream.sorted(Comparator.comparing(PresetOption::getPricePerPerson, Comparator.nullsLast(Long::compareTo))
                     .thenComparingLong(PresetOption::getId));
         } else if ("price_desc".equalsIgnoreCase(sort)) {
-            stream = stream.sorted(Comparator.comparingLong(PresetOption::getPricePerPerson).reversed()
+            stream = stream.sorted(Comparator.comparing(PresetOption::getPricePerPerson, Comparator.nullsLast(Comparator.reverseOrder()))
                     .thenComparingLong(PresetOption::getId));
         }
 

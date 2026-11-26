@@ -55,4 +55,8 @@ public class AppUser {
     @Builder.Default
     @Column(nullable = false)
     private boolean demoAccount = false;
+
+    /** Phiên bản token để vô hiệu hóa toàn bộ access token cũ khi logout hoặc đổi/reset mật khẩu. */
+    @Builder.Default
+    private Long tokenVersion = 0L;
 }

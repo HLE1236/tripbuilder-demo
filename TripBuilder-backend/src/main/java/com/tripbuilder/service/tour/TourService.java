@@ -112,7 +112,21 @@ public class TourService {
 
     @Transactional(readOnly = true)
     public TourDto get(Long id) {
-        return toDto(find(id));
+        return get(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public TourDto get(Long id, AppUser actingUser) {
+        Tour tour = find(id);
+        if (Boolean.FALSE.equals(tour.getActive())) {
+            boolean isAdmin = actingUser != null && actingUser.getRole() == Role.ADMIN;
+            boolean isOwnerGuide = actingUser != null && actingUser.getRole() == Role.GUIDE
+                    && tour.getGuide() != null && actingUser.getId().equals(tour.getGuide().getId());
+            if (!isAdmin && !isOwnerGuide) {
+                throw new BadRequestException("Tour mẫu này hiện đang tạm ẩn");
+            }
+        }
+        return toDto(tour);
     }
 
     @Transactional
@@ -246,7 +260,10 @@ public class TourService {
             if (s.pricePerPerson() < 0 || s.pricePerPerson() > 500_000_000L) {
                 throw new BadRequestException("Đơn giá hoạt động phải từ 0đ đến 500.000.000đ");
             }
-            int day = Math.max(1, Math.min(req.days(), s.dayNumber()));
+            if (s.dayNumber() < 1 || s.dayNumber() > req.days()) {
+                throw new BadRequestException("Ngày của hoạt động phải từ 1 đến " + req.days());
+            }
+            int day = s.dayNumber();
             long price = s.pricePerPerson();
             String stepImg = (s.imageUrl() != null && !s.imageUrl().isBlank())
                     ? validateSafeImageUrl(s.imageUrl())
